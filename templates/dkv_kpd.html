@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% set active = "dkv_kpd" %}
+{% block title %}КПД ДКВ — НИХ Байтерек{% endblock %}
+{% block content %}
+<div class="page-hdr">
+  <div class="page-title">📊 КПД ДКВ</div>
+</div>
+
+<!-- Sub tabs -->
+<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+  {% for emp in employees %}
+  <a href="/dkv/kpd?tab={{ emp }}"
+    style="padding:7px 16px;border-radius:20px;font-size:11px;font-weight:700;text-decoration:none;border:1px solid {% if tab==emp %}var(--dark){% else %}var(--light){% endif %};background:{% if tab==emp %}var(--dark){% else %}#fff{% endif %};color:{% if tab==emp %}var(--cream){% else %}var(--mid){% endif %};">
+    {% if emp=='map' %}ДКВ{% else %}{{ emp }}{% endif %}
+  </a>
+  {% endfor %}
+</div>
+
+{% set rows = kpd_rows|selectattr("employee","equalto",tab)|list %}
+
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--cream2);">
+    <div style="font-size:12px;font-weight:700;color:var(--dark);">
+      {% if tab=='map' %}🗺 Карта КПД ДКВ{% else %}📊 КПД — {{ tab }}{% endif %}
+    </div>
+    <button class="btn btn-primary" onclick="openModal('addKpdModal')">+ Добавить показатель</button>
+  </div>
+
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:1100px;">
+      <thead>
+        <tr>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;white-space:nowrap;">№</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 12px;text-align:left;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;min-width:160px;">Наименование</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;white-space:nowrap;">Ед. изм.</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;white-space:nowrap;">Формула</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 12px;text-align:left;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;min-width:200px;">Описание формулы</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 12px;text-align:left;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;min-width:140px;">Источник данных</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;">Вес</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;white-space:nowrap;">Тип знач.</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;">Порог</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;">Цель</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;">Вызов</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;">Факт</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;white-space:nowrap;">Результ.</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;min-width:90px;">Подтверж.</th>
+          <th style="background:#2d3a1f;color:#f5f0e8;padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;letter-spacing:.5px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr style="{% if loop.index is even %}background:#fafaf8;{% endif %}">
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;font-weight:700;color:var(--dark);font-size:12px;">{{ loop.index }}</td>
+          <td style="padding:10px 12px;border:1px solid var(--light);font-weight:600;color:var(--dark);font-size:12px;">{{ r.name or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;color:var(--dark);font-size:12px;">{{ r.unit or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;font-size:11px;font-family:monospace;color:var(--dark);">{{ r.formula or '—' }}</td>
+          <td style="padding:10px 12px;border:1px solid var(--light);font-size:11px;color:var(--dark);">{{ r.formula_desc or '—' }}</td>
+          <td style="padding:10px 12px;border:1px solid var(--light);font-size:11px;color:var(--dark);">{{ r.data_source or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;font-weight:700;color:var(--dark);font-size:12px;">{{ r.weight or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;font-size:11px;color:var(--dark);">{{ r.value_type or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;color:var(--dark);font-size:12px;">{{ r.threshold or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;color:var(--dark);font-size:12px;">{{ r.goal or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;color:var(--dark);font-size:12px;">{{ r.challenge or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;color:var(--accent);font-weight:700;font-size:12px;">{{ r.fact or '—' }}</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;font-size:11px;color:var(--dark);">—</td>
+          <td style="padding:10px 8px;border:1px solid var(--light);text-align:center;">
+            {% if r.file_name %}
+            <div style="display:flex;gap:4px;align-items:center;">
+              <a href="/dkv/kpd/file/{{ r.id }}" style="font-size:10px;color:var(--accent);font-weight:700;text-decoration:none;">📎 {{ r.file_name[:10] }}{% if r.file_name|length > 10 %}...{% endif %}</a>
+              <form method="post" action="/dkv/kpd/file_delete/{{ r.id }}" style="display:inline;" onsubmit="return confirm('Удалить файл?')">
+                <button type="submit" class="btn btn-danger btn-xs" style="padding:2px 6px;font-size:9px;">✕</button>
+              </form>
+            </div>
+            {% else %}
+            <span style="font-size:10px;color:var(--light);">нет файла</span>
+            {% endif %}
+          </td>
+          <td style="padding:6px 4px;border:1px solid var(--light);text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center;">
+            <a href="/dkv/kpd/edit/{{ r.id }}" class="btn btn-ghost btn-xs" style="padding:4px 8px;font-size:9px;">✏</a>
+            <form method="post" action="/dkv/kpd/delete/{{ r.id }}" style="display:inline;" onsubmit="return confirm('Удалить показатель?')">
+              <input type="hidden" name="employee" value="{{ tab }}">
+              <input type="hidden" name="quarter" value="{{ quarter }}">
+              <button class="btn btn-danger btn-xs" style="padding:4px 8px;font-size:9px;">🗑</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="15" style="padding:30px;text-align:center;color:var(--mid);border:1px solid var(--light);">
+          Показателей нет — нажмите «+ Добавить показатель»
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add KPD Modal -->
+<div class="modal-bg" id="addKpdModal"><div class="modal" style="width:620px;max-height:90vh;overflow-y:auto;">
+  <div class="modal-title">+ Добавить показатель КПД</div>
+  <form method="post" action="/dkv/kpd/add" enctype="multipart/form-data">
+    <input type="hidden" name="employee" value="{{ tab }}">
+    <input type="hidden" name="quarter" value="{{ quarter }}">
+      <div class="fg" style="grid-column:1/-1"><label>Наименование показателя</label>
+        <input name="name" required placeholder="Введите наименование..."></div>
+    </div>
+    <div class="fgrow3">
+      <div class="fg"><label>Единицы измерения</label><input name="unit" placeholder="%  /  дата  /  ед."></div>
+      <div class="fg"><label>Формула расчёта</label><input name="formula" placeholder="N/S×100"></div>
+      <div class="fg"><label>Тип значения</label>
+        <select name="value_type"><option>Число</option><option>Дата</option><option>%</option><option>Да/Нет</option></select>
+      </div>
+    </div>
+    <div class="fg"><label>Описание формулы</label>
+      <textarea name="formula_desc" rows="3" placeholder="Опишите что означает каждая переменная формулы..."></textarea>
+    </div>
+    <div class="fg"><label>Источник данных</label>
+      <input name="data_source" placeholder="Протокол, СЭД, SimBase..."></div>
+    <div class="fgrow3">
+      <div class="fg"><label>Вес (%)</label><input name="weight" placeholder="20.00" type="number" step="0.01"></div>
+      <div class="fg"><label>Порог</label><input name="threshold" placeholder="70"></div>
+      <div class="fg"><label>Цель</label><input name="goal" placeholder="85"></div>
+    </div>
+    <div class="fgrow">
+      <div class="fg"><label>Вызов</label><input name="challenge" placeholder="100"></div>
+      <div class="fg"><label>Факт</label><input name="fact" placeholder="—"></div>
+    </div>
+    <div class="fg"><label>Подтверждение (файл)</label>
+      <div class="file-drop"
+        onclick="document.getElementById('kpdFile').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='#f0f7e8';"
+        ondragleave="this.style.borderColor='';this.style.background='';"
+        ondrop="event.preventDefault();var f=event.dataTransfer.files[0];if(f){var dt=new DataTransfer();dt.items.add(f);document.getElementById('kpdFile').files=dt.files;document.getElementById('kpdFileText').textContent='✅ '+f.name;}this.style.borderColor='';this.style.background='';">
+        <input type="file" id="kpdFile" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg" style="display:none;"
+          onchange="document.getElementById('kpdFileText').textContent=this.files[0]?'✅ '+this.files[0].name:'📎 Нажмите или перетащите файл'">
+        <div style="font-size:18px;margin-bottom:4px;">📎</div>
+        <div id="kpdFileText" style="font-size:11px;color:var(--mid);">📎 Нажмите или перетащите файл подтверждения</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addKpdModal')">Отмена</button>
+      <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+    </div>
+  </form>
+</div></div>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% set active = "dkv_kpd" %}
+{% block title %}Редактирование КПД — НИХ Байтерек{% endblock %}
+{% block content %}
+<div class="page-hdr">
+  <div class="page-title">✏️ Редактирование показателя КПД</div>
+</div>
+
+<div class="card" style="max-width:700px;">
+  <form method="post" action="/dkv/kpd/update/{{ row.id }}" enctype="multipart/form-data">
+    <div style="padding:16px;border-bottom:1px solid var(--cream2);">
+      <div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:12px;">
+        Сотрудник: <span style="color:var(--accent);font-weight:800;">{{ row.employee }}</span>
+      </div>
+    </div>
+
+    <div style="padding:24px;">
+      <div class="fgrow">
+        <div class="fg" style="grid-column:1/-1"><label>Наименование показателя</label>
+          <input name="name" required value="{{ row.name or '' }}" placeholder="Введите наименование..."></div>
+      </div>
+
+      <div class="fgrow3">
+        <div class="fg"><label>Единицы измерения</label><input name="unit" value="{{ row.unit or '' }}" placeholder="%  /  дата  /  ед."></div>
+        <div class="fg"><label>Формула расчёта</label><input name="formula" value="{{ row.formula or '' }}" placeholder="N/S×100"></div>
+        <div class="fg"><label>Тип значения</label>
+          <select name="value_type">
+            <option {% if row.value_type=='Число' %}selected{% endif %}>Число</option>
+            <option {% if row.value_type=='Дата' %}selected{% endif %}>Дата</option>
+            <option {% if row.value_type=='%' %}selected{% endif %}>%</option>
+            <option {% if row.value_type=='Да/Нет' %}selected{% endif %}>Да/Нет</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fg"><label>Описание формулы</label>
+        <textarea name="formula_desc" rows="3" placeholder="Опишите что означает каждая переменная формулы...">{{ row.formula_desc or '' }}</textarea>
+      </div>
+
+      <div class="fg"><label>Источник данных</label>
+        <input name="data_source" value="{{ row.data_source or '' }}" placeholder="Протокол, СЭД, SimBase..."></div>
+
+      <div class="fgrow3">
+        <div class="fg"><label>Вес (%)</label><input name="weight" value="{{ row.weight or '' }}" placeholder="20.00" type="number" step="0.01"></div>
+        <div class="fg"><label>Порог</label><input name="threshold" value="{{ row.threshold or '' }}" placeholder="70"></div>
+        <div class="fg"><label>Цель</label><input name="goal" value="{{ row.goal or '' }}" placeholder="85"></div>
+      </div>
+
+      <div class="fgrow">
+        <div class="fg"><label>Вызов</label><input name="challenge" value="{{ row.challenge or '' }}" placeholder="100"></div>
+        <div class="fg"><label>Факт</label><input name="fact" value="{{ row.fact or '' }}" placeholder="—"></div>
+      </div>
+
+      <div class="fg"><label>Подтверждение (файл)</label>
+        {% if row.file_name %}
+        <div style="background:#f0f7e8;border:1px solid #c5e0a0;border-radius:4px;padding:10px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--dark);">📎 Текущий файл:</div>
+            <div style="font-size:10px;color:var(--mid);margin-top:2px;">{{ row.file_name }}</div>
+          </div>
+          <form method="post" action="/dkv/kpd/file_delete/{{ row.id }}" style="display:inline;" onsubmit="return confirm('Удалить файл?')">
+            <button type="submit" class="btn btn-danger btn-sm">🗑 Удалить</button>
+          </form>
+        </div>
+        {% endif %}
+        <div class="file-drop"
+          onclick="document.getElementById('kpdEditFile').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='#f0f7e8';"
+          ondragleave="this.style.borderColor='';this.style.background='';"
+          ondrop="event.preventDefault();var f=event.dataTransfer.files[0];if(f){var dt=new DataTransfer();dt.items.add(f);document.getElementById('kpdEditFile').files=dt.files;document.getElementById('kpdEditFileText').textContent='✅ '+f.name;}this.style.borderColor='';this.style.background='';">
+          <input type="file" id="kpdEditFile" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg" style="display:none;"
+            onchange="document.getElementById('kpdEditFileText').textContent=this.files[0]?'✅ '+this.files[0].name:'📎 Нажмите или перетащите новый файл'">
+          <div style="font-size:18px;margin-bottom:4px;">📎</div>
+          <div id="kpdEditFileText" style="font-size:11px;color:var(--mid);">📎 Нажмите или перетащите новый файл (или оставьте пусто)</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:20px;border-top:1px solid var(--cream2);padding-top:16px;justify-content:flex-end;">
+        <a href="/dkv/kpd?tab={{ row.employee }}&quarter={{ row.quarter }}" class="btn btn-ghost">Отмена</a>
+        <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

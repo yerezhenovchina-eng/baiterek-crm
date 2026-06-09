@@ -1,0 +1,537 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+:root {
+  --graphite-green: #4a6741;
+  --grey: #9a9a9a;
+  --grey-light: #c0c0c0;
+  --success: #2d6a4f;
+  --warning: #ff9800;
+  --danger: #c62828;
+}
+
+/* ВКЛАДКИ СОТРУДНИКОВ */
+.emp-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(237,231,217,0.6) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(212, 205, 184, 0.5);
+}
+
+.emp-tab {
+  padding: 12px 10px;
+  border-radius: 8px;
+  border: 2px solid var(--grey-light);
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 8px rgba(45, 58, 31, 0.08);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emp-tab:hover {
+  border-color: var(--grey);
+  transform: translateY(-2px);
+}
+
+.emp-tab.active {
+  border: 3px solid var(--graphite-green);
+  transform: translateY(-4px);
+  box-shadow: 
+    0 0 0 3px rgba(74, 103, 65, 0.15),
+    0 0 20px rgba(74, 103, 65, 0.3),
+    0 4px 15px rgba(74, 103, 65, 0.2);
+  animation: borderGlow 1.4s ease-in-out infinite;
+}
+
+/* ВКЛАДКИ КВАРТАЛОВ */
+.quarter-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.quarter-tab {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 2px solid var(--grey-light);
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.4s ease;
+  box-shadow: 0 3px 6px rgba(45, 58, 31, 0.06);
+}
+
+.quarter-tab:hover {
+  border-color: var(--grey);
+  transform: translateY(-2px);
+}
+
+.quarter-tab.active {
+  border: 3px solid var(--graphite-green);
+  transform: translateY(-3px);
+  box-shadow: 
+    0 0 0 3px rgba(74, 103, 65, 0.15),
+    0 0 15px rgba(74, 103, 65, 0.25),
+    0 3px 12px rgba(74, 103, 65, 0.15);
+  animation: borderGlow 1.4s ease-in-out infinite;
+}
+
+/* ТАБЛИЦА */
+.section-title {
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--dark);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--light);
+}
+
+.table-wrapper {
+  background: #fff;
+  border: 1px solid var(--light);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(45, 58, 31, 0.08);
+  margin-bottom: 28px;
+}
+
+.table-scroll { overflow-x: auto; }
+
+.kpd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9px;
+}
+
+.kpd-table th {
+  background: var(--cream3);
+  color: var(--dark);
+  font-weight: 700;
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--light);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.kpd-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--cream2);
+  color: var(--dark);
+}
+
+.kpd-table tr:hover {
+  background: rgba(74, 103, 65, 0.03);
+}
+
+.kpd-table td.num {
+  font-weight: 700;
+  text-align: center;
+  width: 30px;
+}
+
+.kpd-table td.name {
+  font-weight: 600;
+  width: 150px;
+}
+
+/* ОБЗОР */
+.overview-title {
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--dark);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--light);
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--light);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(45, 58, 31, 0.08);
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(45, 58, 31, 0.12);
+  transform: translateY(-2px);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--graphite-green) 0%, #5a8a50 100%);
+}
+
+.card-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 8px;
+}
+
+.card-status {
+  display: inline-block;
+  font-size: 7px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.status-done {
+  background: rgba(45, 106, 79, 0.15);
+  color: var(--success);
+}
+
+.status-progress {
+  background: rgba(255, 152, 0, 0.15);
+  color: var(--warning);
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+.status-overdue {
+  background: rgba(198, 40, 40, 0.15);
+  color: var(--danger);
+}
+
+.circle-progress {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 10px;
+  position: relative;
+}
+
+.circle-bg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--cream2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+
+.circle-svg {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  top: 0;
+  left: 0;
+}
+
+.circle-fill {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 8;
+  stroke: var(--graphite-green);
+  stroke-dasharray: 376;
+  stroke-dashoffset: 376;
+  transform: rotate(-90deg);
+  transform-origin: 60px 60px;
+  transition: stroke-dashoffset 0.8s ease;
+  filter: drop-shadow(0 0 6px rgba(74, 103, 65, 0.3));
+}
+
+.circle-text {
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+.circle-value {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--graphite-green);
+  line-height: 1;
+  animation: valuePulse 1.5s ease-in-out infinite;
+}
+
+.circle-label {
+  font-size: 7px;
+  color: var(--mid);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.card-metrics {
+  display: flex;
+  justify-content: space-around;
+  font-size: 7px;
+  padding-top: 8px;
+  border-top: 1px solid var(--cream2);
+}
+
+.metric-label {
+  color: var(--light2);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 6px;
+}
+
+.metric-value {
+  font-weight: 800;
+  color: #000;
+  font-size: 9px;
+  margin-top: 1px;
+}
+
+/* АНИМАЦИИ */
+@keyframes borderGlow {
+  0%, 100% {
+    box-shadow: 
+      0 0 0 3px rgba(74, 103, 65, 0.15),
+      0 0 20px rgba(74, 103, 65, 0.3),
+      0 4px 15px rgba(74, 103, 65, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 0 0 4px rgba(74, 103, 65, 0.25),
+      0 0 28px rgba(74, 103, 65, 0.4),
+      0 4px 18px rgba(74, 103, 65, 0.3);
+  }
+}
+
+@keyframes valuePulse {
+  0%, 100% { font-size: 28px; opacity: 1; }
+  50% { font-size: 30px; opacity: 0.95; }
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.add-btn {
+  display: inline-block;
+  padding: 10px 16px;
+  background: var(--dark);
+  color: var(--cream);
+  border: none;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transition: all 0.3s;
+}
+
+.add-btn:hover {
+  background: var(--graphite-green);
+  box-shadow: 0 4px 12px rgba(74, 103, 65, 0.2);
+}
+</style>
+
+<div style="padding: 20px;">
+  <div style="font-size: 18px; font-weight: 900; color: var(--dark); margin-bottom: 24px;">💵 КПД ДКВ</div>
+
+  <!-- ВКЛАДКИ СОТРУДНИКОВ -->
+  <div class="emp-tabs">
+    <button class="emp-tab active" onclick="switchTab(this, 'emp')">Кпд дкв</button>
+    <button class="emp-tab" onclick="switchTab(this, 'emp')">Ардак</button>
+    <button class="emp-tab" onclick="switchTab(this, 'emp')">Ильмира</button>
+    <button class="emp-tab" onclick="switchTab(this, 'emp')">Акбота</button>
+    <button class="emp-tab" onclick="switchTab(this, 'emp')">Жанна</button>
+    <button class="emp-tab" onclick="switchTab(this, 'emp')">Динара</button>
+    <button class="emp-tab" onclick="switchTab(this, 'emp')">Чингиз</button>
+  </div>
+
+  <!-- ВКЛАДКИ КВАРТАЛОВ -->
+  <div class="quarter-tabs">
+    <button class="quarter-tab active" onclick="switchTab(this, 'quarter')">Ⅰ I квартал</button>
+    <button class="quarter-tab" onclick="switchTab(this, 'quarter')">Ⅱ II квартал</button>
+    <button class="quarter-tab" onclick="switchTab(this, 'quarter')">Ⅲ III квартал</button>
+    <button class="quarter-tab" onclick="switchTab(this, 'quarter')">Ⅳ IV квартал</button>
+  </div>
+
+  <!-- ТАБЛИЦА -->
+  <div class="section-title">📋 Детальная таблица показателей</div>
+  <div class="table-wrapper">
+    <div class="table-scroll">
+      <table class="kpd-table">
+        <thead>
+          <tr>
+            <th class="num">№</th>
+            <th class="name">КПД</th>
+            <th>Ед.изм.</th>
+            <th>Формула</th>
+            <th>Описание</th>
+            <th>Источник</th>
+            <th>Вес %</th>
+            <th>Порог</th>
+            <th>Цель</th>
+            <th>Факт</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">1</td>
+            <td class="name">Исполнительская дисциплина</td>
+            <td>%</td>
+            <td>Дисп = (N1+N2+N3+N4)/S</td>
+            <td>Процент исполнения...</td>
+            <td>SimBase</td>
+            <td>20</td>
+            <td>70</td>
+            <td>85</td>
+            <td>92</td>
+          </tr>
+          <tr>
+            <td class="num">2</td>
+            <td class="name">Актуализация ВНД</td>
+            <td>текст</td>
+            <td>m = реализованное мероприятие</td>
+            <td>Направление материалов...</td>
+            <td>СЭД</td>
+            <td>40</td>
+            <td>—</td>
+            <td>—</td>
+            <td>3</td>
+          </tr>
+          <tr>
+            <td class="num">3</td>
+            <td class="name">Центр компетенций</td>
+            <td>дата</td>
+            <td>ГГГГ-ММ-ДД</td>
+            <td>Дата проведения...</td>
+            <td>Протокол</td>
+            <td>40</td>
+            <td>25.06</td>
+            <td>19.06</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ОБЗОР -->
+  <div class="overview-title">🎯 Быстрый обзор показателей</div>
+  <div class="cards-grid">
+    <!-- Card 1 -->
+    <div class="card">
+      <div class="card-name">Исполн. дисциплина</div>
+      <div class="card-status status-done">✓ Исполнен</div>
+      <div class="circle-progress">
+        <div class="circle-bg">
+          <svg class="circle-svg" viewBox="0 0 120 120">
+            <circle class="circle-fill" id="fill1" cx="60" cy="60" r="60"></circle>
+          </svg>
+          <div class="circle-text">
+            <div class="circle-value" id="val1">0%</div>
+            <div class="circle-label">выполнено</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-metrics">
+        <div><div class="metric-label">Факт</div><div class="metric-value">92%</div></div>
+        <div><div class="metric-label">Цель</div><div class="metric-value">85%</div></div>
+      </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="card">
+      <div class="card-name">Актуализ. ВНД</div>
+      <div class="card-status status-progress">⏳ На исполнении</div>
+      <div class="circle-progress">
+        <div class="circle-bg">
+          <svg class="circle-svg" viewBox="0 0 120 120">
+            <circle class="circle-fill" id="fill2" cx="60" cy="60" r="60"></circle>
+          </svg>
+          <div class="circle-text">
+            <div class="circle-value" id="val2">0%</div>
+            <div class="circle-label">завершено</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-metrics">
+        <div><div class="metric-label">Факт</div><div class="metric-value">3 шт</div></div>
+        <div><div class="metric-label">Цель</div><div class="metric-value">4 шт</div></div>
+      </div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="card">
+      <div class="card-name">Центр компетен.</div>
+      <div class="card-status status-overdue">✗ Просрочен</div>
+      <div class="circle-progress">
+        <div class="circle-bg">
+          <svg class="circle-svg" viewBox="0 0 120 120">
+            <circle class="circle-fill" id="fill3" cx="60" cy="60" r="60"></circle>
+          </svg>
+          <div class="circle-text">
+            <div class="circle-value" id="val3">0%</div>
+            <div class="circle-label">в пути</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-metrics">
+        <div><div class="metric-label">Факт</div><div class="metric-value">—</div></div>
+        <div><div class="metric-label">Цель</div><div class="metric-value">25.06</div></div>
+      </div>
+    </div>
+  </div>
+
+  <button class="add-btn">+ Добавить показатель</button>
+</div>
+
+<script>
+function switchTab(btn, type) {
+  const tabs = type === 'emp' 
+    ? document.querySelectorAll('.emp-tab')
+    : document.querySelectorAll('.quarter-tab');
+  
+  tabs.forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('fill1').style.strokeDashoffset = 376 * (1 - 0.92);
+    document.getElementById('val1').textContent = '92%';
+    
+    document.getElementById('fill2').style.strokeDashoffset = 376 * (1 - 0.75);
+    document.getElementById('val2').textContent = '75%';
+    
+    document.getElementById('fill3').style.strokeDashoffset = 376 * (1 - 0.50);
+    document.getElementById('val3').textContent = '50%';
+  }, 100);
+});
+</script>
+{% endblock %}

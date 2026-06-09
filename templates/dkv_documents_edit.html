@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% set active = "dkv_docs" %}
+{% block title %}Редактирование документа — НИХ Байтерек{% endblock %}
+{% block content %}
+<div class="page-hdr">
+  <div class="page-title">✏️ Редактирование документа</div>
+</div>
+
+<div class="card" style="max-width:700px;">
+  <form method="post" action="/dkv/documents/update/{{ doc.id }}" enctype="multipart/form-data">
+    <div style="padding:16px;border-bottom:1px solid var(--cream2);">
+      <div style="font-size:12px;font-weight:700;color:var(--dark);">
+        Документ: <span style="color:var(--accent);font-weight:800;">{{ doc.name }}</span>
+      </div>
+      <div style="font-size:10px;color:var(--mid);margin-top:6px;">
+        Загруженный файл: <strong>{{ doc.file_name or '(без файла)' }}</strong>
+      </div>
+    </div>
+
+    <div style="padding:24px;">
+      <div class="fg" style="margin-bottom:16px;">
+        <label>Наименование документа</label>
+        <input name="name" required value="{{ doc.name or '' }}" placeholder="Введите название..."></div>
+
+      <div class="fg">
+        <label>Файл документа</label>
+        {% if doc.file_name %}
+        <div style="background:#f0f7e8;border:1px solid #c5e0a0;border-radius:4px;padding:10px 12px;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:var(--dark);">📎 Текущий файл:</div>
+          <div style="font-size:10px;color:var(--mid);margin-top:2px;">{{ doc.file_name }}</div>
+          <div style="font-size:9px;color:var(--mid);margin-top:4px;font-style:italic;">Загрузите новый файл, чтобы его заменить, или оставьте пусто для сохранения текущего</div>
+        </div>
+        {% endif %}
+        <div class="file-drop"
+          onclick="document.getElementById('dkvEditFile').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='#f0f7e8';"
+          ondragleave="this.style.borderColor='';this.style.background='';"
+          ondrop="event.preventDefault();var f=event.dataTransfer.files[0];if(f){var dt=new DataTransfer();dt.items.add(f);document.getElementById('dkvEditFile').files=dt.files;document.getElementById('dkvEditFileText').textContent='✅ '+f.name;}this.style.borderColor='';this.style.background='';">
+          <input type="file" id="dkvEditFile" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" style="display:none;"
+            onchange="document.getElementById('dkvEditFileText').textContent=this.files[0]?'✅ '+this.files[0].name:'📎 Нажмите или перетащите'">
+          <div style="font-size:18px;margin-bottom:4px;">📎</div>
+          <div id="dkvEditFileText" style="font-size:11px;color:var(--mid);">📎 Нажмите или перетащите файл</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:24px;border-top:1px solid var(--cream2);padding-top:16px;justify-content:flex-end;">
+        <a href="/dkv/documents" class="btn btn-ghost">Отмена</a>
+        <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

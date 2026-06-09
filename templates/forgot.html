@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Сброс пароля — НИХ Байтерек</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Montserrat',sans-serif;background:#1a2410;min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;}
+body::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(122,179,23,.06) 0%,transparent 65%);}
+body::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.01) 3px,rgba(255,255,255,.011) 4px);}
+.box{background:#f5f0e8;border-radius:6px;padding:32px;width:380px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.4);position:relative;z-index:1;}
+.box::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#7ab317,#5a8a0a);border-radius:6px 6px 0 0;}
+.title{font-size:20px;font-weight:900;color:#2d3a1f;letter-spacing:-1px;margin-bottom:4px;}
+.sub{font-size:10px;color:#8a9a70;line-height:1.6;margin-bottom:24px;}
+label{display:block;font-size:9px;font-weight:700;color:#8a9a70;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+input,textarea{width:100%;background:#ede7d9;border:1px solid #d4cdb8;border-radius:4px;color:#2d3a1f;font-size:13px;padding:9px 10px;font-family:inherit;margin-bottom:12px;}
+input:focus,textarea:focus{outline:none;border-color:#7ab317;}
+textarea{resize:none;height:70px;font-size:12px;}
+.btn{width:100%;background:#2d3a1f;color:#f5f0e8;border:none;border-radius:4px;padding:12px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:1px;text-transform:uppercase;transition:all .3s;margin-top:4px;}
+.btn:hover{background:#7ab317;color:#2d3a1f;}
+.back{display:block;text-align:center;margin-top:14px;font-size:10px;color:#8a9a70;text-decoration:none;}
+.back:hover{color:#2d3a1f;}
+.success{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:4px;padding:12px 14px;font-size:12px;color:#2e7d32;margin-bottom:16px;line-height:1.6;}
+.icon{font-size:32px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div class="box">
+  {% if sent %}
+    <div class="icon">✅</div>
+    <div class="title">Запрос отправлен</div>
+    <div style="font-size:12px;color:#8a9a70;margin-top:8px;margin-bottom:20px;line-height:1.7;">
+      Ваш запрос на сброс пароля отправлен администратору.<br>
+      Обратитесь к <b style="color:#2d3a1f;">Admin</b> — он установит временный пароль.
+    </div>
+    <a href="/login" class="btn" style="display:block;text-align:center;text-decoration:none;">← Вернуться ко входу</a>
+  {% else %}
+    <div class="icon">🔑</div>
+    <div class="title">Забыл пароль</div>
+    <div class="sub">Укажите ваш логин. Администратор установит временный пароль.</div>
+    <form method="post" action="/forgot-password">
+      <label>Ваш логин</label>
+      <input name="username" required placeholder="Например: Akbota" autofocus>
+      <label>Комментарий (необязательно)</label>
+      <textarea name="comment" placeholder="Опишите ситуацию..."></textarea>
+      <button class="btn" type="submit">Отправить запрос</button>
+    </form>
+    <a href="/login" class="back">← Вернуться ко входу</a>
+  {% endif %}
+</div>
+</body>
+</html>

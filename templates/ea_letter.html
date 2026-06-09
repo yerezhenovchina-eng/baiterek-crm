@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Драфт письма</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Montserrat',sans-serif;background:#eef1f6;padding:20px;}
+.toolbar{background:#fff;border:1px solid #d4cdb8;border-radius:6px;padding:12px 18px;margin:0 auto 16px;display:flex;gap:10px;align-items:center;max-width:720px;}
+.toolbar-title{font-size:11px;font-weight:700;color:#2d3a1f;flex:1;}
+.toolbar-sub{font-size:10px;color:#8a9a70;margin-top:1px;}
+.btn{background:#2d3a1f;color:#f5f0e8;border:none;border-radius:4px;padding:8px 18px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif;letter-spacing:1px;text-transform:uppercase;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
+.btn:hover{background:#7ab317;color:#2d3a1f;}
+.btn-ghost{background:transparent;color:#2d3a1f;border:1px solid #d4cdb8;}
+.letter{background:#fff;max-width:720px;margin:0 auto;padding:52px 64px;box-shadow:0 4px 24px rgba(0,0,0,.1);font-family:'PT Serif',Georgia,serif;font-size:14px;line-height:2;color:#000;}
+.letter-to{font-size:14px;font-weight:700;text-align:center;margin-bottom:32px;}
+.letter-p{text-indent:40px;margin-bottom:14px;text-align:justify;}
+.letter-p.no-indent{text-indent:0;}
+[contenteditable]{border:none;border-bottom:1px dashed #7ab317;background:rgba(122,179,23,.04);padding:0 3px;cursor:text;outline:none;display:inline;min-width:24px;font-family:'PT Serif',Georgia,serif;font-size:14px;line-height:2;color:#000;}
+[contenteditable]:focus{background:rgba(122,179,23,.12);border-bottom-color:#5a8a0a;}
+[contenteditable]:empty:before{content:attr(data-placeholder);color:#bbb;font-style:italic;}
+.letter-sign{margin-top:40px;display:flex;justify-content:space-between;}
+.sign-bold{font-weight:700;}
+@media print{
+  .toolbar{display:none;}
+  body{background:#fff;padding:0;}
+  .letter{box-shadow:none;max-width:100%;padding:40px 52px;}
+  [contenteditable]{border-bottom:none;background:none;}
+  [contenteditable]:empty:before{content:'';}
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <div>
+    <div class="toolbar-title">✉ Драфт сопроводительного письма</div>
+    <div class="toolbar-sub">{{ org.name }} · {{ ea.title }}</div>
+  </div>
+  <a href="/org/{{ org.id }}?tab=ea" class="btn btn-ghost">← Назад</a>
+  <button class="btn" onclick="window.print()">🖨 Печать / PDF</button>
+</div>
+
+<div class="letter">
+  <div class="letter-to" contenteditable="true">{{ org.name }}</div>
+
+  <div class="letter-p">
+    АО «НИХ «Байтерек» направляет выписку из протокола
+    <span contenteditable="true" data-placeholder="очного/заочного"></span> заседания
+    Правления АО «НИХ «Байтерек» от
+    <span contenteditable="true" data-placeholder="«___» _________ 20___ года">{% if ea.decision_date %}{{ fmt(ea.decision_date) }}{% endif %}</span>
+    (протокол № <span contenteditable="true" data-placeholder="__/__">{% if ea.requisites %}{{ ea.requisites }}{% endif %}</span>) по
+    вопросу № <span contenteditable="true" data-placeholder="__"></span>
+    «<span contenteditable="true" data-placeholder="Наименование вопроса...">{% if ea.question_text %}{{ ea.question_text }}{% endif %}</span>».
+  </div>
+
+  <div class="letter-p">
+    При этом, сообщаем о необходимости принятия мер, вытекающих из принятого решения.
+  </div>
+
+  <div class="letter-p no-indent">
+    Приложение на <span contenteditable="true" data-placeholder="__"></span> листах.
+  </div>
+
+  <div class="letter-sign">
+    <div class="sign-bold" contenteditable="true" data-placeholder="Должность">Заместитель Председателя Правления</div>
+    <div class="sign-bold" contenteditable="true" data-placeholder="И. Фамилия">В. Сон</div>
+  </div>
+</div>
+</body>
+</html>

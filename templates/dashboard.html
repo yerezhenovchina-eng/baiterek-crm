@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% set active = "home" %}
+{% block title %}Главная — НИХ Байтерек{% endblock %}
+{% block content %}
+
+<!-- HERO -->
+<div style="background:var(--dark);padding:28px 32px;margin:-28px -32px 28px;position:relative;overflow:hidden;">
+  <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2),transparent);"></div>
+  <div style="position:absolute;right:40px;top:50%;transform:translateY(-50%);font-size:120px;font-weight:900;color:rgba(255,255,255,.03);letter-spacing:-5px;pointer-events:none;white-space:nowrap;">БАЙТЕРЕК</div>
+  <div style="font-size:9px;font-weight:600;letter-spacing:5px;color:rgba(122,179,23,.6);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+    <span style="width:28px;height:1px;background:rgba(122,179,23,.4);display:inline-block;"></span>
+    Корпоративная карточка ДО / ДЗО
+  </div>
+  <div style="font-size:22px;font-weight:900;color:#f5f0e8;letter-spacing:-.5px;margin-bottom:4px;">
+    Дочерние и зависимые организации <span style="color:var(--accent);">АО «НИХ» Байтерек</span>
+  </div>
+  <div style="font-size:10px;color:rgba(245,240,232,.4);letter-spacing:1px;margin-bottom:20px;">Добро пожаловать, {{ session.full_name }}</div>
+  <div style="display:flex;gap:0;">
+    <div style="padding:12px 28px;border:1px solid rgba(255,255,255,.08);border-right:none;">
+      <div style="font-size:28px;font-weight:900;color:#f5f0e8;">{{ stats|sum(attribute='sessions') }}</div>
+      <div style="font-size:8px;color:rgba(245,240,232,.3);text-transform:uppercase;letter-spacing:2px;margin-top:2px;">Заседаний СД</div>
+    </div>
+    <div style="padding:12px 28px;border:1px solid rgba(255,255,255,.08);">
+      <div style="font-size:28px;font-weight:900;color:#f5f0e8;">{{ stats|sum(attribute='agenda') }}</div>
+      <div style="font-size:8px;color:rgba(245,240,232,.3);text-transform:uppercase;letter-spacing:2px;margin-top:2px;">Вопросов повестки</div>
+    </div>
+  </div>
+</div>
+
+{% if upcoming %}
+<div id="upcomingBanner" style="margin-bottom:20px;background:linear-gradient(135deg,#1a2a0f,#2d3a1f);border:1px solid rgba(122,179,23,.25);border-radius:10px;overflow:hidden;position:relative;">
+  <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent);"></div>
+  <div style="padding:12px 16px 10px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:16px;">📅</span>
+      <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;">Предстоящие заседания СД — ближайшие 30 дней</span>
+      <span style="background:var(--accent);color:#1a2a0f;border-radius:10px;padding:1px 8px;font-size:9px;font-weight:800;">{{ upcoming|length }}</span>
+    </div>
+    <button onclick="document.getElementById('upcomingBanner').style.display='none'" style="background:none;border:none;color:rgba(245,240,232,.3);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
+  </div>
+  <div style="padding:0 16px 12px;display:flex;flex-wrap:wrap;gap:8px;">
+    {% for ev in upcoming %}
+    {% set days_left = ((ev.date | replace("-","") | int) - (today_str | replace("-","") | int)) %}
+    <a href="/org/{{ ev.org.id }}?tab=sessions" style="text-decoration:none;display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(122,179,23,.2);border-radius:6px;transition:background .2s;" onmouseover="this.style.background='rgba(122,179,23,.12)'" onmouseout="this.style.background='rgba(255,255,255,.05)'">
+      <img src="/static/logos_clean/{{ logo_map[ev.org.short] }}.png" style="height:16px;max-width:40px;object-fit:contain;filter:brightness(0) invert(1);opacity:.7;" onerror="this.style.display='none'">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#f5f0e8;">{{ ev.org.short }}</div>
+        <div style="font-size:9px;color:rgba(245,240,232,.5);">{{ ev.date[8:10] }}.{{ ev.date[5:7] }}.{{ ev.date[:4] }} · {{ ev.format }}</div>
+      </div>
+      {% if ev.tag == 'today' %}<span style="background:#e53935;color:#fff;border-radius:4px;padding:1px 6px;font-size:8px;font-weight:800;">СЕГОДНЯ</span>
+      {% elif ev.tag == 'soon' %}<span style="background:#f57c00;color:#fff;border-radius:4px;padding:1px 6px;font-size:8px;font-weight:700;">СКОРО</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;">Все организации</div>
+
+<div class="org-grid">
+{% for st in stats %}
+<a href="/org/{{ st.org.id }}" class="org-cell" style="animation:fadeInUp .4s ease {{ loop.index0 * 0.05 }}s both;">
+  <div class="org-cell-logo"><img src="/static/logos_clean/{{ logo_map[st.org.short] }}.png" alt="{{ st.org.short }}" onerror="this.style.display='none'"></div>
+  <div class="org-cell-short">{{ st.org.short }}</div>
+  <div class="org-cell-name">{{ st.org.name }}</div>
+  <div class="org-cell-line"></div>
+  <div style="display:flex;gap:14px;margin-bottom:8px;">
+    <div><div class="org-cell-num">{{ st.sessions }}</div><div class="org-cell-lbl">Заседаний</div></div>
+    <div><div class="org-cell-num">{{ st.agenda }}</div><div class="org-cell-lbl">Вопросов</div></div>
+  </div>
+  <div style="display:flex;gap:14px;padding-top:8px;border-top:1px solid var(--light);">
+    <div><div class="org-cell-num" style="font-size:14px;">{{ st.members }}</div><div class="org-cell-lbl">Членов СД</div></div>
+    <div><div class="org-cell-num" style="font-size:14px;color:var(--accent);">{{ st.independent }}</div><div class="org-cell-lbl">Независимых</div></div>
+  </div>
+  <div class="org-cell-arr">↗</div>
+</a>
+{% endfor %}
+</div>
+
+<div style="margin-top:16px;padding:12px 16px;background:var(--cream2);border-left:3px solid var(--accent);font-size:11px;color:var(--mid);">
+  <b style="color:var(--dark);">Разграничение редактирования:</b> все видят все организации. Редактирование — только куратору своих ДО/ДЗО. Администратор имеет полный доступ.
+</div>
+{% endblock %}

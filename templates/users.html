@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set active = "users" %}
+{% block title %}Пользователи — НИХ Байтерек{% endblock %}
+{% block content %}
+<div class="page-hdr">
+  <div class="page-title">👥 Управление пользователями</div>
+  <button class="btn btn-primary" onclick="openModal('addUser')">+ Добавить пользователя</button>
+</div>
+<div class="card">
+  <table class="tbl">
+    <thead><tr><th>Логин</th><th>ФИО</th><th>Роль</th><th>Курирует</th><th>Статус</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+    <tr>
+      <td style="font-weight:700;">{{ u.username }}</td>
+      <td>{{ u.full_name }}</td>
+      <td>{% if u.role=='admin' %}<span class="badge b-admin">Администратор</span>{% elif u.role=='viewer' %}<span class="badge" style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;">👁 Просмотр</span>{% else %}<span class="badge b-staff">Сотрудник</span>{% endif %}</td>
+      <td style="font-size:10px;color:var(--mid);">
+        {% for org in ORGANIZATIONS %}{% if org.curator==u.username %}<span style="background:var(--cream2);border:1px solid var(--light);border-radius:2px;padding:1px 6px;font-size:9px;font-weight:700;margin-right:3px;">{{ org.short }}</span>{% endif %}{% endfor %}
+      </td>
+      <td>{% if u.is_active %}<span class="badge b-done">Активен</span>{% else %}<span class="badge b-notdone">Отключён</span>{% endif %}</td>
+      <td style="white-space:nowrap;display:flex;gap:6px;align-items:center;">
+        <form method="post" action="/users/toggle/{{ u.id }}" style="display:inline;">
+          <button class="btn btn-ghost btn-sm">{{ '⏸ Откл.' if u.is_active else '▶ Вкл.' }}</button>
+        </form>
+        <button class="btn btn-ghost btn-sm" onclick="openReset({{ u.id }},'{{ u.username|e }}')">🔑 Пароль</button>
+        {% if u.username != 'admin' %}
+        <form method="post" action="/users/delete/{{ u.id }}" style="display:inline;" onsubmit="return confirm('Удалить пользователя {{ u.username }}? Это действие необратимо.')">
+          <button class="btn btn-danger btn-sm">🗑 Удалить</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ADD USER -->
+<div class="modal-bg" id="addUser"><div class="modal">
+  <div class="modal-title">Добавить пользователя</div>
+  <form method="post" action="/users/add">
+    <div class="fgrow">
+      <div class="fg"><label>Логин</label><input name="username" required placeholder="ivanov"></div>
+      <div class="fg"><label>ФИО</label><input name="full_name" required placeholder="Иванов И.И."></div>
+    </div>
+    <div class="fgrow">
+      <div class="fg"><label>Роль</label><select name="role"><option value="staff">Сотрудник</option><option value="admin">Администратор</option></select></div>
+      <div class="fg"><label>Пароль</label><input name="password" type="password" required placeholder="Временный пароль"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addUser')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Создать</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- RESET PASSWORD -->
+<div class="modal-bg" id="resetPwd"><div class="modal">
+  <div class="modal-title">Сброс пароля — <span id="resetName"></span></div>
+  <form method="post" id="resetForm">
+    <div class="fg"><label>Новый пароль</label><input name="new_password" type="password" required placeholder="Новый пароль"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('resetPwd')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Установить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- PASSWORD REQUESTS -->
+{% set new_reqs = pwd_requests|selectattr('status','eq','new')|list %}
+{% if pwd_requests %}
+<div style="margin-top:28px;">
+  {% if new_reqs %}
+  <div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:4px;padding:10px 16px;font-size:11px;color:#e65100;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+    <span style="font-size:16px;">🔔</span>
+    <b>{{ new_reqs|length }} новых запросов</b> на сброс пароля
+  </div>
+  {% endif %}
+  <div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;">🔑 Запросы на сброс пароля</div>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>Пользователь</th><th>Логин</th><th>Дата запроса</th><th>Комментарий</th><th>Статус</th><th>Действие</th></tr></thead>
+      <tbody>
+      {% for req in pwd_requests %}
+      <tr>
+        <td style="font-weight:700;">{{ req.full_name }}</td>
+        <td style="color:var(--mid);">{{ req.username }}</td>
+        <td style="font-size:11px;color:var(--mid);">{{ req.created_at[:16].replace('T',' ') }}</td>
+        <td style="font-size:11px;color:var(--mid);">{{ req.comment or '—' }}</td>
+        <td>
+          {% if req.status=='new' %}
+          <span class="badge" style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80;">🔔 Новый</span>
+          {% else %}
+          <span class="badge b-done">✓ Выполнен</span>
+          {% endif %}
+        </td>
+        <td style="white-space:nowrap;">
+          {% if req.status=='new' %}
+          <button class="btn btn-primary btn-sm" onclick="openPwdModal({{ req.id }},'{{ req.username|e }}','{{ req.full_name|e }}')">🔑 Задать пароль</button>
+          {% endif %}
+          <form method="post" action="/users/pwd-request/dismiss/{{ req.id }}" style="display:inline;" onsubmit="return confirm('Удалить запрос?')">
+            <button class="btn btn-ghost btn-sm">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Set Password Modal -->
+<div class="modal-bg" id="pwdModal"><div class="modal">
+  <div class="modal-title">🔑 Установить пароль — <span id="pwdUserName"></span></div>
+  <form method="post" id="pwdForm">
+    <div class="fg"><label>Временный пароль</label><input name="new_password" required placeholder="Введите временный пароль" id="pwdInput"></div>
+    <div style="font-size:10px;color:var(--mid);margin-bottom:10px;">Сообщите этот пароль пользователю лично или по телефону.</div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('pwdModal')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Установить</button>
+    </div>
+  </form>
+</div></div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+function openPwdModal(rid,uname,fname){
+  document.getElementById('pwdUserName').textContent=fname+' ('+uname+')';
+  document.getElementById('pwdForm').action='/users/pwd-request/resolve/'+rid;
+  openModal('pwdModal');
+}
+function openReset(uid,uname){
+  document.getElementById('resetName').textContent=uname;
+  document.getElementById('resetForm').action='/users/reset-password/'+uid;
+  openModal('resetPwd');
+}
+</script>
+{% endblock %}

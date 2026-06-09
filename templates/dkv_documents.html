@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set active = "dkv_docs" %}
+{% block title %}Документы ДКВ — НИХ Байтерек{% endblock %}
+{% block content %}
+<div class="page-hdr">
+  <div class="page-title">📁 Документы ДКВ</div>
+</div>
+
+<!-- Upload form -->
+<div class="card" style="margin-bottom:16px;">
+  <div style="padding:14px 16px;border-bottom:1px solid var(--cream2);display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">Добавить документ</div>
+  </div>
+  <form method="post" action="/dkv/documents/add" enctype="multipart/form-data" style="padding:16px;">
+    <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;">
+      <div>
+        <div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Наименование документа</div>
+        <input name="name" required placeholder="Введите название документа..."
+          style="width:100%;padding:10px 12px;border:1px solid var(--light);border-radius:4px;font-family:inherit;font-size:12px;color:var(--dark);background:var(--cream2);">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Файл</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="file-drop" style="padding:8px 14px;cursor:pointer;min-width:200px;"
+            onclick="document.getElementById('dkvFile').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--accent)';"
+            ondragleave="this.style.borderColor='';"
+            ondrop="event.preventDefault();var f=event.dataTransfer.files[0];if(f){var dt=new DataTransfer();dt.items.add(f);document.getElementById('dkvFile').files=dt.files;document.getElementById('dkvFileText').textContent='✅ '+f.name;}this.style.borderColor='';">
+            <input type="file" id="dkvFile" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" style="display:none;"
+              onchange="document.getElementById('dkvFileText').textContent=this.files[0]?'✅ '+this.files[0].name:'📎 Выбрать файл'">
+            <div id="dkvFileText" style="font-size:11px;color:var(--mid);text-align:center;">📎 Нажмите или перетащите</div>
+          </div>
+          <button type="submit" class="btn btn-primary">+ Добавить</button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Document list -->
+<div class="card">
+  <div style="padding:14px 16px;border-bottom:1px solid var(--cream2);">
+    <div style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">Список документов ({{ docs|length }})</div>
+  </div>
+  {% for d in docs %}
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--cream2);">
+    <div style="font-size:22px;">
+      {% if d.file_name and '.pdf' in d.file_name %}📄
+      {% elif d.file_name and ('.xls' in d.file_name or '.xlsx' in d.file_name) %}📊
+      {% elif d.file_name and ('.doc' in d.file_name or '.docx' in d.file_name) %}📝
+      {% else %}📎{% endif %}
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:12px;font-weight:700;color:var(--dark);">{{ d.name }}</div>
+      <div style="font-size:10px;color:var(--mid);margin-top:2px;">
+        {% if d.file_name %}📎 {{ d.file_name }} · {% endif %}
+        Загрузил: {{ d.uploaded_by }} · {{ d.created_at[:10] }}
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      {% if d.file_name %}
+      <a href="/dkv/documents/view/{{ d.id }}" target="_blank" class="btn btn-ghost btn-sm">👁 Просмотр</a>
+      <a href="/dkv/documents/view/{{ d.id }}?download=1" class="btn btn-ghost btn-sm">⬇ Скачать</a>
+      {% endif %}
+      <a href="/dkv/documents/edit/{{ d.id }}" class="btn btn-ghost btn-sm">✏ Редакт.</a>
+      <form method="post" action="/dkv/documents/delete/{{ d.id }}" style="display:inline;"
+        onsubmit="return confirm('Удалить документ: {{ d.name|e }}?')">
+        <button class="btn btn-danger btn-sm">🗑</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div style="padding:40px;text-align:center;color:var(--mid);">
+    <div style="font-size:32px;margin-bottom:8px;">📁</div>
+    Документов пока нет — добавьте первый
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

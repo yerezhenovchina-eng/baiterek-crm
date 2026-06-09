@@ -1,0 +1,564 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+:root {
+  --graphite-green: #4a6741;
+  --grey: #9a9a9a;
+  --grey-light: #c0c0c0;
+  --success: #2d6a4f;
+  --warning: #ff9800;
+  --danger: #c62828;
+}
+
+.kpd-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.kpd-title { font-size: 16px; font-weight: 900; }
+
+.emp-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(237,231,217,0.6) 100%);
+  border-radius: 10px;
+}
+
+.emp-tab {
+  padding: 10px;
+  border-radius: 8px;
+  border: 2px solid var(--grey-light);
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  color: #000;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.4s ease;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emp-tab.active {
+  border: 3px solid var(--graphite-green);
+  box-shadow: 0 0 15px rgba(74, 103, 65, 0.3);
+}
+
+.quarter-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.quarter-tab {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 2px solid var(--grey-light);
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  color: #000;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.quarter-tab.active {
+  border: 3px solid var(--graphite-green);
+  box-shadow: 0 0 10px rgba(74, 103, 65, 0.2);
+}
+
+.section-title {
+  font-size: 9px;
+  font-weight: 900;
+  color: var(--dark);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--light);
+}
+
+.table-wrapper {
+  background: #fff;
+  border: 1px solid var(--light);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(45, 58, 31, 0.08);
+  margin-bottom: 24px;
+}
+
+.table-scroll { overflow-x: auto; max-height: 300px; overflow-y: auto; }
+.kpd-table { width: 100%; border-collapse: collapse; font-size: 8px; }
+.kpd-table th {
+  background: var(--cream3);
+  color: var(--dark);
+  font-weight: 700;
+  padding: 10px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--light);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  position: sticky;
+  top: 0;
+}
+
+.kpd-table td { padding: 8px 6px; border-bottom: 1px solid var(--cream2); color: var(--dark); word-wrap: break-word; white-space: normal; }
+.kpd-table tr:hover { background: rgba(74, 103, 65, 0.03); }
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--light);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(45, 58, 31, 0.08);
+  position: relative;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.card:hover { box-shadow: 0 4px 12px rgba(45, 58, 31, 0.12); transform: translateY(-2px); }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--graphite-green) 0%, #5a8a50 100%); }
+
+.card-name { font-size: 10px; font-weight: 700; color: #000; margin-bottom: 6px; line-height: 1.2; min-height: 24px; }
+.card-status {
+  display: inline-block;
+  font-size: 6px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.status-done { background: rgba(45, 106, 79, 0.15); color: var(--success); }
+.status-progress { background: rgba(255, 152, 0, 0.15); color: var(--warning); }
+.status-overdue { background: rgba(198, 40, 40, 0.15); color: var(--danger); }
+
+.circle-progress {
+  width: 110px;
+  height: 110px;
+  margin: 0 auto 8px;
+  position: relative;
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circle-bg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--cream2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+
+.circle-svg {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  top: 0;
+  left: 0;
+  z-index: 2;
+}
+
+.circle-fill-green, .circle-fill-yellow, .circle-fill-red {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 7;
+  stroke-dasharray: 346;
+  stroke-dashoffset: 346;
+  transform: rotate(-90deg);
+  transform-origin: 55px 55px;
+  transition: stroke-dashoffset 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.circle-fill-green { stroke: #2d6a4f; filter: drop-shadow(0 0 4px rgba(45, 106, 79, 0.3)); }
+.circle-fill-yellow { stroke: #ff9800; filter: drop-shadow(0 0 4px rgba(255, 152, 0, 0.3)); }
+.circle-fill-red { stroke: #c62828; filter: drop-shadow(0 0 4px rgba(198, 40, 40, 0.3)); }
+
+.card:hover .circle-fill-green,
+.card:hover .circle-fill-yellow,
+.card:hover .circle-fill-red {
+  stroke-dashoffset: var(--offset);
+}
+
+.circle-text { text-align: center; position: relative; z-index: 3; }
+.circle-value { font-size: 24px; font-weight: 900; color: var(--graphite-green); line-height: 1; }
+.circle-label { font-size: 6px; color: var(--mid); text-transform: uppercase; margin-top: 1px; }
+
+.add-btn { padding: 8px 14px; background: var(--dark); color: #fff; border: none; border-radius: 6px; font-size: 9px; font-weight: 700; cursor: pointer; margin-top: 12px; }
+.add-btn:hover { background: var(--graphite-green); }
+</style>
+
+<div style="padding: 16px;">
+  <div class="kpd-header">
+    <div class="kpd-title">📊 КПД ДКВ</div>
+  </div>
+
+  <!-- ВКЛАДКИ СОТРУДНИКОВ -->
+  <div class="emp-tabs">
+    {% for emp in employees %}
+      <a href="/dkv/kpd?tab={{ emp }}&quarter={{ quarter }}" class="emp-tab {% if emp == tab %}active{% endif %}">
+        {% if emp == 'map' %}ДКВ{% else %}{{ emp }}{% endif %}
+      </a>
+    {% endfor %}
+  </div>
+
+  <!-- ВКЛАДКИ КВАРТАЛОВ -->
+  <div class="quarter-tabs">
+    {% for q in quarters %}
+      <a href="/dkv/kpd?tab={{ tab }}&quarter={{ q }}" class="quarter-tab {% if q == quarter %}active{% endif %}">
+        {{ q }} квартал
+      </a>
+    {% endfor %}
+  </div>
+
+  <!-- ТАБЛИЦА -->
+  <div class="section-title">📋 Таблица показателей</div>
+  <div class="table-wrapper">
+    <div class="table-scroll">
+      <table class="kpd-table">
+        <thead>
+          <tr>
+            <th style="width: 25px;">№</th>
+            <th>КПД</th>
+            <th>Ед.изм.</th>
+            <th>Формула</th>
+            <th>Описание</th>
+            <th>Источник</th>
+            <th>Вес %</th>
+            <th>Порог</th>
+            <th>Вызов</th>
+            <th>Цель</th>
+            <th>Факт</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in kpd_rows %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.unit }}</td>
+            <td>{{ row.formula }}</td>
+            <td>{{ row.formula_desc }}</td>
+            <td>{{ row.data_source }}</td>
+            <td>{{ row.weight }}</td>
+            <td>{{ row.threshold or '—' }}</td>
+            <td>{{ row.challenge or '—' }}</td>
+            <td>{{ row.goal or '—' }}</td>
+            <td>{{ row.fact or '—' }}</td>
+            <td style="white-space:nowrap;">
+              {% if can_edit_kpd(session, tab) %}
+              <a href="/dkv/kpd/edit/{{ row.id }}" style="font-size:9px;color:var(--dark);font-weight:700;text-decoration:none;padding:3px 7px;border:1px solid var(--light);border-radius:4px;margin-right:3px;">✏</a>
+              <form method="post" action="/dkv/kpd/delete/{{ row.id }}" style="display:inline;" onsubmit="return confirm('Удалить показатель?')">
+                <input type="hidden" name="employee" value="{{ tab }}">
+                <input type="hidden" name="quarter" value="{{ quarter }}">
+                <button style="font-size:9px;color:#c62828;background:none;border:1px solid #c62828;border-radius:4px;padding:3px 7px;cursor:pointer;">🗑</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="11" style="text-align: center; color: #999; padding: 20px;">Нет данных</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- КНОПКА ДОБАВИТЬ — сразу после таблицы -->
+  {% if can_edit_kpd(session, tab) %}
+  <button class="add-btn" onclick="document.getElementById('addKpdModal').style.display='flex'">+ Добавить показатель</button>
+  {% endif %}
+
+  <!-- ОБЗОР КПД — анимированные сегментированные круги -->
+  <div class="section-title" style="margin-top:24px;">🎯 Обзор КПД</div>
+
+  <!-- Передаём данные из Jinja2 в JS через data-атрибут -->
+  <div id="kpdOverviewData" style="display:none;">
+    [{% for row in kpd_rows %}{"name":{{ row.name|tojson }},"fact":{{ row.fact|tojson if row.fact else "null" }},"threshold":{{ row.threshold|tojson if row.threshold else "null" }},"goal":{{ row.goal|tojson if row.goal else "null" }},"challenge":{{ row.challenge|tojson if row.challenge else "null" }}}{% if not loop.last %},{% endif %}{% endfor %}]
+  </div>
+
+  <div id="kpdOverviewGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">
+    {% if not kpd_rows %}
+    <div style="grid-column:1/-1;text-align:center;color:#999;padding:40px;">Нет показателей для отображения</div>
+    {% endif %}
+  </div>
+
+<style>
+.ovr-card {
+  background: linear-gradient(135deg, #1e2d14 0%, #243318 100%);
+  border: 1px solid rgba(168,192,144,0.2);
+  border-radius: 12px;
+  padding: 18px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.ovr-card::before {
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(168,192,144,0.4),transparent);
+}
+.ovr-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(100,200,80,0.12); }
+.ovr-name { font-size:10px;font-weight:700;color:#e8e0d0;text-align:center;line-height:1.3;min-height:28px; }
+.ovr-status { font-size:8px;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px; }
+.ovr-done     { background:rgba(45,106,79,.25);  color:#6ee89a; border:1px solid rgba(110,232,154,.3); }
+.ovr-progress { background:rgba(255,152,0,.2);   color:#ffb74d; border:1px solid rgba(255,183,77,.3); }
+.ovr-overdue  { background:rgba(198,40,40,.2);   color:#ef9a9a; border:1px solid rgba(239,154,154,.3); }
+.ovr-wrap { position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center; }
+.ovr-center { position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;pointer-events:none; }
+.ovr-pct { font-size:22px;font-weight:900;line-height:1; }
+.ovr-lbl { font-size:6px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8aa070;margin-top:2px; }
+</style>
+
+<script>
+(function(){
+  const raw = document.getElementById('kpdOverviewData').textContent.trim();
+  let rows = [];
+  try { rows = JSON.parse(raw); } catch(e) { return; }
+
+  const SEGMENTS=32, GAP=4, SEG=(360/SEGMENTS)-GAP;
+  const CX=60,CY=60,ROUT=52,RIN=40;
+  const NS='http://www.w3.org/2000/svg';
+
+  function pt(deg,r){
+    const rad=(deg-90)*Math.PI/180;
+    return {x:CX+r*Math.cos(rad),y:CY+r*Math.sin(rad)};
+  }
+  function segPath(i){
+    const s=i*(360/SEGMENTS)+GAP/2, e=s+SEG;
+    const a=pt(s,ROUT),b=pt(e,ROUT),c=pt(e,RIN),d=pt(s,RIN);
+    return `M${a.x} ${a.y}A${ROUT} ${ROUT} 0 0 1 ${b.x} ${b.y}L${c.x} ${c.y}A${RIN} ${RIN} 0 0 0 ${d.x} ${d.y}Z`;
+  }
+  // ── Определение типа значения ──────────────────────────────────
+  function isDate(v){
+    return v && /^\d{2}\.\d{2}\.\d{4}$/.test(v.trim());
+  }
+  function parseDate(v){
+    const p = v.trim().split('.');
+    return new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+  }
+  function isNumber(v){
+    return v !== null && v !== '' && !isNaN(parseFloat(v));
+  }
+
+  // ── Вычисление статуса ──────────────────────────────────────────
+  function getStatus(row){
+    const fact = row.fact;
+    const hasFact = fact !== null && fact !== undefined && fact !== '';
+
+    // Нет факта → На исполнении
+    if(!hasFact) return {pct:0, stroke:'#ffb74d', glow:'rgba(255,183,77,.7)', text:'#ffb74d', cls:'ovr-progress', lbl:'⏳ На исполнении'};
+
+    // Текст (не число и не дата)
+    if(!isDate(String(fact)) && !isNumber(fact)){
+      return {pct:100, stroke:'#6ee89a', glow:'rgba(110,232,154,.7)', text:'#6ee89a', cls:'ovr-done', lbl:'✓ Исполнен'};
+    }
+
+    // Дата
+    if(isDate(String(fact))){
+      const fDate = parseDate(String(fact));
+      if(row.challenge && isDate(String(row.challenge))){
+        if(fDate <= parseDate(String(row.challenge)))
+          return {pct:100, stroke:'#00e676', glow:'rgba(0,230,118,.7)', text:'#00e676', cls:'ovr-done', lbl:'✓ Исполнен (Вызов)'};
+      }
+      if(row.goal && isDate(String(row.goal))){
+        if(fDate <= parseDate(String(row.goal)))
+          return {pct:100, stroke:'#6ee89a', glow:'rgba(110,232,154,.7)', text:'#6ee89a', cls:'ovr-done', lbl:'✓ Исполнен (Цель)'};
+      }
+      if(row.threshold && isDate(String(row.threshold))){
+        if(fDate <= parseDate(String(row.threshold)))
+          return {pct:100, stroke:'#c6e84a', glow:'rgba(198,232,74,.7)', text:'#c6e84a', cls:'ovr-done', lbl:'✓ Исполнен (Порог)'};
+      }
+      return {pct:0, stroke:'#ef9a9a', glow:'rgba(239,154,154,.7)', text:'#ef9a9a', cls:'ovr-overdue', lbl:'✗ Просрочен'};
+    }
+
+    // Число / %
+    const f = parseFloat(fact);
+    if(row.challenge && isNumber(row.challenge)){
+      const ch = parseFloat(row.challenge);
+      if(f >= ch) return {pct:100, stroke:'#00e676', glow:'rgba(0,230,118,.7)', text:'#00e676', cls:'ovr-done', lbl:'✓ Исполнен (Вызов)'};
+    }
+    if(row.goal && isNumber(row.goal)){
+      const g = parseFloat(row.goal);
+      if(f >= g) return {pct:Math.min(Math.round(f/g*100),100), stroke:'#6ee89a', glow:'rgba(110,232,154,.7)', text:'#6ee89a', cls:'ovr-done', lbl:'✓ Исполнен (Цель)'};
+    }
+    if(row.threshold && isNumber(row.threshold)){
+      const t = parseFloat(row.threshold);
+      if(f >= t) return {pct:Math.min(Math.round(f/t*100),100), stroke:'#c6e84a', glow:'rgba(198,232,74,.7)', text:'#c6e84a', cls:'ovr-done', lbl:'✓ Исполнен (Порог)'};
+    }
+    // Просрочен — но pct считаем от порога для визуализации
+    const base = (row.threshold && isNumber(row.threshold)) ? parseFloat(row.threshold) : 
+                 (row.goal && isNumber(row.goal)) ? parseFloat(row.goal) : 
+                 (row.challenge && isNumber(row.challenge)) ? parseFloat(row.challenge) : 0;
+    const pctFail = base > 0 ? Math.min(Math.round(f/base*100), 99) : 0;
+    return {pct:pctFail, stroke:'#ef9a9a', glow:'rgba(239,154,154,.7)', text:'#ef9a9a', cls:'ovr-overdue', lbl:'✗ Просрочен'};
+  }
+
+  const grid = document.getElementById('kpdOverviewGrid');
+  const anims = [];
+
+  rows.forEach(function(row, ci){
+    const c = getStatus(row);
+    const pct = c.pct;
+    const active = Math.round(pct/100*SEGMENTS);
+
+    // SVG
+    const svg = document.createElementNS(NS,'svg');
+    svg.setAttribute('viewBox','0 0 120 120');
+    svg.setAttribute('width','120'); svg.setAttribute('height','120');
+
+    const defs = document.createElementNS(NS,'defs');
+    defs.innerHTML = `<filter id="gf${ci}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+    svg.appendChild(defs);
+
+    if(pct>=100){
+      const ring=document.createElementNS(NS,'circle');
+      ring.setAttribute('cx',CX);ring.setAttribute('cy',CY);
+      ring.setAttribute('r',(ROUT+RIN)/2);ring.setAttribute('fill','none');
+      ring.setAttribute('stroke',c.stroke);ring.setAttribute('stroke-width',ROUT-RIN);
+      ring.setAttribute('stroke-opacity','0.07');
+      svg.appendChild(ring);
+    }
+
+    const segs=[];
+    for(let i=0;i<SEGMENTS;i++){
+      const p=document.createElementNS(NS,'path');
+      p.setAttribute('d',segPath(i));
+      if(i<active){
+        p.setAttribute('fill',c.stroke);
+        p.setAttribute('filter',`url(#gf${ci})`);
+        p.style.opacity='0';
+        p.style.transition='opacity .05s ease';
+      } else {
+        p.setAttribute('fill','rgba(255,255,255,.07)');
+      }
+      svg.appendChild(p);
+      segs.push({el:p,on:i<active});
+    }
+
+    // Обёртка
+    const wrap=document.createElement('div');
+    wrap.className='ovr-wrap';
+    wrap.appendChild(svg);
+
+    const center=document.createElement('div');
+    center.className='ovr-center';
+    // Для дат и текста не показываем процент — только иконку статуса
+    const isDateFact = row.fact && /^\d{2}\.\d{2}\.\d{4}$/.test(String(row.fact).trim());
+    const isNumFact  = row.fact && !isNaN(parseFloat(row.fact)) && !isDateFact;
+    const centerLbl  = (!row.fact) ? '—' : (isNumFact ? '0%' : (c.cls==='ovr-done' ? '✓' : '✗'));
+    center.innerHTML=`<div class="ovr-pct" style="color:${c.text}">${centerLbl}</div><div class="ovr-lbl">${isNumFact ? 'прогресс' : ''}</div>`;
+    wrap.appendChild(center);
+
+    // Карточка
+    const card=document.createElement('div');
+    card.className='ovr-card';
+    card.innerHTML=`<div class="ovr-name">${row.name}</div><div class="ovr-status ${c.cls}">${c.lbl}</div>`;
+    card.appendChild(wrap);
+    grid.appendChild(card);
+
+    anims.push({segs,active,pct,pctEl:center.querySelector('.ovr-pct'),showPct:isNumFact});
+  });
+
+  // Запускаем анимации
+  setTimeout(function(){
+    anims.forEach(function(a,ci){
+      const delay=ci*150;
+      const STEP=40;
+      setTimeout(function(){
+        a.segs.forEach(function(s,i){
+          if(!s.on) return;
+          setTimeout(function(){ s.el.style.opacity='1'; }, i*STEP);
+        });
+        // Анимируем счётчик только для числовых значений
+        if(a.showPct && a.pct>0){
+          const totalMs=Math.max(a.active*STEP,1);
+          const t0=performance.now();
+          (function tick(now){
+            const prog=Math.min((now-t0)/totalMs,1);
+            a.pctEl.textContent=Math.round(prog*a.pct)+'%';
+            if(prog<1) requestAnimationFrame(tick);
+          })(performance.now());
+        }
+        // Для дат/текста/пустого — текст уже задан, не трогаем
+      }, delay);
+    });
+  }, 300);
+})();
+</script>
+
+</div>
+
+<!-- МОДАЛ ДОБАВИТЬ КПД -->
+<div id="addKpdModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;width:640px;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <div style="font-size:13px;font-weight:900;color:var(--dark);margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;">
+      <span>+ Добавить показатель КПД</span>
+      <button onclick="document.getElementById('addKpdModal').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--mid);">✕</button>
+    </div>
+    <form method="post" action="/dkv/kpd/add" enctype="multipart/form-data">
+      <input type="hidden" name="employee" value="{{ tab }}">
+      <input type="hidden" name="quarter" value="{{ quarter }}">
+      <div class="fgrow" style="display:grid;gap:10px;margin-bottom:10px;">
+        <div class="fg"><label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Наименование показателя</label>
+          <input name="name" required placeholder="Введите наименование..." style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Ед. измерения</label>
+          <input name="unit" placeholder="% / дата / ед." style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+        <div><label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Формула</label>
+          <input name="formula" placeholder="N/S×100" style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+        <div><label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Тип значения</label>
+          <select name="value_type" style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;">
+            <option>Число</option><option>Дата</option><option>%</option><option>Да/Нет</option>
+          </select></div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Описание формулы</label>
+        <textarea name="formula_desc" rows="3" placeholder="Опишите что означает каждая переменная..." style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;resize:vertical;"></textarea>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Источник данных</label>
+        <input name="data_source" placeholder="Протокол, СЭД, SimBase..." style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Вес (%)</label>
+          <input name="weight" placeholder="20" type="number" step="0.01" style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+        <div><label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Порог</label>
+          <input name="threshold" placeholder="70" style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+        <div><label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Цель</label>
+          <input name="goal" placeholder="85" style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+        <div><label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Вызов</label>
+          <input name="challenge" placeholder="100" style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:9px;font-weight:700;color:var(--dark);display:block;margin-bottom:4px;">Факт</label>
+        <input name="fact" placeholder="—" style="width:100%;padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:11px;box-sizing:border-box;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--light);padding-top:14px;">
+        <button type="button" onclick="document.getElementById('addKpdModal').style.display='none'"
+          style="padding:8px 16px;background:none;border:1px solid var(--light);border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;">Отмена</button>
+        <button type="submit"
+          style="padding:8px 16px;background:var(--dark);color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;">💾 Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

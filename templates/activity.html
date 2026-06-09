@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% set active = "activity" %}
+{% block title %}Активность — НИХ Байтерек{% endblock %}
+{% block content %}
+<div class="page-hdr">
+  <div class="page-title">📊 Активность</div>
+</div>
+
+<div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;">
+  📋 История изменений{% if session.role != "admin" %} — ваши ДО{% endif %}
+</div>
+<div class="card">
+  <table class="tbl">
+    <thead><tr><th>Дата / Время</th><th>Пользователь</th><th>Действие</th><th>Организация</th><th>Детали</th></tr></thead>
+    <tbody>
+    {% for log in logs %}
+    <tr>
+      <td style="font-size:10px;color:var(--mid);white-space:nowrap;">{{ log.created_at[:16].replace("T"," ") }}</td>
+      <td style="font-weight:600;font-size:12px;">{{ log.full_name }}<br><span style="font-size:9px;color:var(--mid);">{{ log.username }}</span></td>
+      <td>
+        {% if "upload" in log.action %}<span class="badge" style="background:#f3e5f5;color:#7b1fa2;border:1px solid #ce93d8;">⬆ Загрузка</span>
+        {% elif "delete" in log.action %}<span class="badge b-notdone">✕ Удаление</span>
+        {% elif "edit" in log.action %}<span class="badge" style="background:#e3f2fd;color:#1565c0;border:1px solid #90caf9;">✎ Изменение</span>
+        {% elif "add" in log.action %}<span class="badge b-done">+ Добавление</span>
+        {% else %}<span class="badge b-mem">{{ log.action }}</span>{% endif %}
+      </td>
+      <td style="font-size:11px;font-weight:700;">
+        {% if log.org_id %}{% for org in ORGANIZATIONS %}{% if org.id==log.org_id %}{{ org.short }}{% endif %}{% endfor %}{% else %}—{% endif %}
+      </td>
+      <td style="font-size:11px;color:var(--mid);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ log.details or "—" }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--mid);">История пуста</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

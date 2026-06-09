@@ -1,0 +1,1543 @@
+{% extends "base.html" %}
+{% set current_org_id = org.id %}
+{% block title %}{{ org.short }} — {{ org.name }}{% endblock %}
+{% block content %}
+
+<!-- ORG STRIP -->
+<div class="org-strip">
+  {% if org_logo %}
+  <img src="/static/logos_clean/{{ org_logo }}.png" alt="{{ org.short }}"
+       style="height:28px;max-width:90px;object-fit:contain;"
+       onerror="this.style.display='none'">
+  {% endif %}
+  <div class="org-strip-name" style="margin-left:8px;">{{ org.name }}</div>
+  <a href="/org/{{ org.id }}/report/pdf"
+     class="btn btn-sm"
+     style="margin-left:auto;background:linear-gradient(135deg,#c8a84b,#a07830);color:#1a2a10;font-weight:700;font-size:10px;padding:4px 12px;border-radius:6px;text-decoration:none;"
+     title="Скачать справку по организации в PDF">
+    📄 Справка PDF
+  </a>
+  {% if editable %}
+  <div class="org-strip-editable" style="margin-left:8px;">✏ Редактирование</div>
+  {% else %}
+  <div class="org-strip-readonly" style="margin-left:8px;">👁 Только просмотр</div>
+  {% endif %}
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn {% if tab=='sessions' %}active{% endif %}" onclick="switchTab('sessions')">📋 Заседания СД</button>
+  <button class="tab-btn {% if tab=='members' %}active{% endif %}" onclick="switchTab('members')">👤 Состав СД</button>
+  <button class="tab-btn {% if tab=='committees' %}active{% endif %}" onclick="switchTab('committees')">🗂 Комитеты</button>
+  <button class="tab-btn {% if tab=='accountable' %}active{% endif %}" onclick="switchTab('accountable')">🏢 Подотчётные</button>
+  <button class="tab-btn {% if tab=='board' %}active{% endif %}" onclick="switchTab('board')">⚖️ Правление Общества</button>
+  <button class="tab-btn {% if tab=='documents' %}active{% endif %}" onclick="switchTab('documents')">📁 Документы</button>
+  <button class="tab-btn {% if tab=='workplan' %}active{% endif %}" onclick="switchTab('workplan')" style="color:var(--accent2);">📅 План работы СД</button>
+  <button class="tab-btn {% if tab=='ea' %}active{% endif %}" onclick="switchTab('ea')" style="color:var(--accent2);">📄 Решения ЕА</button>
+  <button class="tab-btn {% if tab=='calendar' %}active{% endif %}" onclick="switchTab('calendar')" style="color:var(--accent2);">📅 Календарь</button>
+  {% if editable %}
+  <button class="tab-btn {% if tab=='import' %}active{% endif %}" onclick="switchTab('import')" style="color:#1565c0;">📥 Импорт</button>
+  {% endif %}
+</div>
+
+<!-- ══ SESSIONS ══ -->
+<div id="pane-sessions" class="tab-pane" style="display:{% if tab=='sessions' %}block{% else %}none{% endif %};">
+  <div class="page-hdr">
+    <span style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">Заседания Совета директоров</span>
+    <div style="display:flex;gap:8px;align-items:center;"><a href="/org/{{ org.id }}/export/sessions" class="btn btn-sm" style="background:#217346;color:#fff;">⬇ Excel</a>{% if editable %}<button class="btn btn-sm" onclick="openModal('addSession')" style="background:var(--dark);color:#fff;">+ Заседание</button><button class="btn btn-sm" onclick="document.getElementById('agendaDocxInput').click()" style="background:#1565c0;color:#fff;">📄 Загрузить повестку</button><input type="file" id="agendaDocxInput" accept=".docx" style="display:none;" onchange="parseAgendaDocx(this,{{ org.id }})">{% endif %}</div>
+  </div>
+
+  <!-- ── ПОИСКОВАЯ ПАНЕЛЬ ─────────────────────────────────────── -->
+  <div id="sessSearchBar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:var(--cream2);border-radius:8px;border:1px solid var(--light);">
+    <div style="position:relative;flex:1;min-width:200px;">
+      <input id="sessSearchInput" type="text" placeholder="🔍  Поиск по вопросам, датам, форме..." 
+        oninput="sessSearch()"
+        style="width:100%;padding:8px 12px 8px 12px;border:1px solid var(--light);border-radius:6px;font-size:12px;box-sizing:border-box;background:#fff;color:var(--dark);outline:none;">
+    </div>
+    <select id="sessFilterYear" onchange="sessSearch()" style="padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:12px;background:#fff;color:var(--dark);">
+      <option value="">Все годы</option>
+      {% set years = [] %}{% for s in sessions %}{% if s.session_date and s.session_date|length >= 4 and s.session_date[:4]|int > 2000 and s.session_date[:4] not in years %}{% set _ = years.append(s.session_date[:4]) %}{% endif %}{% endfor %}{% set years = years|sort(reverse=True) %}
+      {% for y in years %}<option value="{{ y }}">{{ y }}</option>{% endfor %}
+    </select>
+    <select id="sessFilterFormat" onchange="sessSearch()" style="padding:8px 10px;border:1px solid var(--light);border-radius:6px;font-size:12px;background:#fff;color:var(--dark);">
+      <option value="">Все формы</option>
+      <option value="Очное">Очное</option>
+      <option value="Заочное">Заочное</option>
+      <option value="Смешанное">Смешанное</option>
+    </select>
+    <button onclick="sessClear()" style="padding:8px 12px;border:1px solid var(--light);border-radius:6px;font-size:11px;background:#fff;color:var(--mid);cursor:pointer;">✕ Сбросить</button>
+    <span id="sessCountBadge" style="font-size:11px;color:var(--mid);white-space:nowrap;"></span>
+  </div>
+  <!-- ──────────────────────────────────────────────────────────── -->
+  {% for s in sessions %}
+  <div class="card sess-card" style="margin-bottom:10px;"
+    data-date="{{ s.session_date }}"
+    data-format="{{ s.format }}"
+    data-order="{{ s.order_type }}"
+    data-text="{{ (agenda_map.get(s.id, [])|map(attribute='text')|join(' '))|e }}"
+  >
+    <div class="acc-hdr" onclick="toggleAcc('sess-{{ s.id }}')">
+      <div style="background:var(--cream2);border:1px solid var(--light);border-radius:3px;padding:3px 10px;font-size:10px;font-weight:800;color:var(--dark);">№ {{ loop.index }}</div>
+      <div style="font-weight:700;">{{ fmt(s.session_date) }}</div>
+      <span class="badge b-mem">{{ s.format }}</span>
+      <span class="badge b-mem">{{ s.order_type }}</span>
+      {% set items = agenda_map.get(s.id, []) %}
+      <span style="font-size:10px;color:var(--mid);margin-left:auto;">{{ items|selectattr('status','eq','done')|list|length }}/{{ items|length }} рассмотрено</span>
+      {% if editable %}
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditSession({{ s.id }},'{{ s.session_date }}','{{ s.format }}','{{ s.order_type }}')">✎</button>
+      {% endif %}
+      {% if editable and session.role=='admin' %}
+      <form method="post" action="/org/{{ org.id }}/sessions/delete/{{ s.id }}" style="margin-left:4px;" onsubmit="return confirmDelete('Вы удаляете заседание от {{ fmt(s.session_date) }}. Все вопросы повестки также будут удалены. Продолжить?')">
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation()">🗑</button>
+      </form>
+      {% endif %}
+      <span style="color:var(--mid);margin-left:4px;">▾</span>
+    </div>
+    <div class="acc-body{% if open_sess == s.id %} open{% endif %}" id="sess-{{ s.id }}">
+      {% set items = agenda_map.get(s.id, []) %}
+      {% if items %}
+      <table class="tbl" style="margin-bottom:10px;">
+        <thead><tr><th>№</th><th>Вопрос</th><th>Статус</th><th>Примечание</th>{% if editable %}<th></th>{% endif %}</tr></thead>
+        <tbody>
+        {% for a in items %}
+        <tr>
+          <td style="color:var(--mid);width:30px;font-size:10px;">{{ loop.index }}</td>
+          <td>{{ a.text or '—' }}</td>
+          <td>{% if a.status=='done' %}<span class="badge b-done">✓ Рассмотрен</span>{% else %}<span class="badge b-notdone">✗ Не рассмотрен</span>{% endif %}</td>
+          <td style="color:var(--mid);font-style:italic;font-size:11px;">{{ a.note or '' }}</td>
+          {% if editable %}
+          <td style="white-space:nowrap;">
+            <button class="btn btn-ghost btn-sm" onclick="openEditAgenda({{ org.id }},{{ s.id }},{{ a.id }},'{{ a.text|e }}','{{ a.status }}','{{ a.note|e }}')">✎</button>
+            <form method="post" action="/org/{{ org.id }}/sessions/{{ s.id }}/agenda/delete/{{ a.id }}" style="display:inline;" onsubmit="return confirmDelete('Удалить вопрос: &quot;{{ a.text[:60]|e }}...&quot;?')">
+              <button class="btn btn-danger btn-sm">🗑</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--mid);font-size:12px;margin-bottom:10px;">Вопросы повестки не добавлены</p>
+      {% endif %}
+      {% if editable %}<button class="btn btn-ghost btn-sm" onclick="openAddAgenda({{ org.id }},{{ s.id }})">+ Добавить вопрос</button>{% endif %}      {% if editable %}
+      <div style="margin-top:10px;padding:8px 10px;background:#f5f8f0;border:1px solid #d0e4b8;border-radius:6px;display:flex;align-items:center;gap:10px;">
+        <div style="font-size:10px;font-weight:700;color:#5a7a3a;white-space:nowrap;">📋 Сводное заключение:</div>
+        <form method="post" action="/org/{{ org.id }}/sessions/{{ s.id }}/file/upload" enctype="multipart/form-data" style="display:flex;gap:6px;align-items:center;flex:1;">
+          <input type="file" name="file" accept=".pdf,.doc,.docx" style="font-size:10px;color:var(--mid);flex:1;" onchange="this.form.querySelector('button').style.display='inline-flex'">
+          <button type="submit" class="btn btn-ghost btn-sm" style="display:none;">⬆ Прикрепить</button>
+        </form>
+      </div>
+      {% endif %}
+      {% set sfiles = sess_files_map.get(s.id, []) %}
+      {% for sf in sfiles %}
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--light);margin-top:6px;">
+        <span style="font-size:14px;">📎</span>
+        <span style="font-size:11px;color:var(--mid);">{{ sf.file_name }}</span>
+        <a href="/org/{{ org.id }}/sessions/{{ s.id }}/file/view/{{ sf.id }}" target="_blank" class="btn btn-ghost btn-sm" style="margin-left:auto;">👁</a>
+        {% if editable %}
+        <form method="post" action="/org/{{ org.id }}/sessions/{{ s.id }}/file/delete/{{ sf.id }}" onsubmit="return confirm('Удалить файл?')">
+          <button class="btn btn-danger btn-sm">✕</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+      
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="padding:40px;text-align:center;color:var(--mid);">Заседаний нет{% if editable %} — нажмите «+ Заседание»{% endif %}</div>
+  {% endfor %}
+</div>
+
+<!-- ══ MEMBERS ══ -->
+<div id="pane-members" class="tab-pane" style="display:{% if tab=='members' %}block{% else %}none{% endif %};">
+  <div class="page-hdr">
+    <span style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">Состав Совета директоров</span>
+    <div style="display:flex;gap:8px;align-items:center;"><a href="/org/{{ org.id }}/export/members" class="btn btn-sm" style="background:#217346;color:#fff;">⬇ Excel</a>{% if editable %}<button class="btn btn-primary" onclick="openModal('addMember')">+ Добавить члена</button>{% endif %}</div>
+  </div>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>№</th><th>ФИО</th><th>Роль</th><th>Должность</th><th>Срок полномочий</th><th>Реквизиты</th>{% if editable %}<th></th>{% endif %}</tr></thead>
+      <tbody>
+      {% for m in members %}
+      <tr>
+        <td style="color:var(--mid);font-size:10px;">{{ loop.index }}</td>
+        <td style="font-weight:700;">{{ m.full_name }}</td>
+        <td>
+          {% if m.role=='psd' %}<span class="badge b-psd">Председатель СД</span>{% else %}<span class="badge b-mem">Член СД</span>{% endif %}
+          {% if m.is_independent %}<br><span class="badge b-ind" style="margin-top:3px;">Независимый директор</span>{% endif %}
+        </td>
+        <td style="color:var(--mid);font-size:11px;">{{ m.position or '—' }}</td>
+        <td style="font-size:11px;">{{ fmt(m.date_from) }} — {{ fmt(m.date_to) if m.date_to else 'н.в.' }}</td>
+        <td style="font-size:10px;color:var(--mid);">{{ m.decision or '—' }}</td>
+        {% if editable %}
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" onclick="openEditMember({{ m.id }},'{{ m.full_name|e }}','{{ m.role }}',{{ m.is_independent }},'{{ m.position|e }}','{{ m.date_from or '' }}','{{ m.date_to or '' }}','{{ m.decision|e }}')">✎</button>
+          {% if session.role=='admin' %}
+          <form method="post" action="/org/{{ org.id }}/members/delete/{{ m.id }}" style="display:inline;" onsubmit="return confirmDelete('Удалить члена СД: {{ m.full_name|e }}?')">
+            <button class="btn btn-danger btn-sm">🗑</button>
+          </form>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--mid);">Нет данных</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ COMMITTEES ══ -->
+<div id="pane-committees" class="tab-pane" style="display:{% if tab=='committees' %}block{% else %}none{% endif %};">
+  <div style="display:flex;gap:0;border-bottom:2px solid var(--light);margin-bottom:16px;">
+    <button class="tab-btn active" id="ctab-comp" onclick="switchCmtTab('comp')">📋 Состав комитетов</button>
+    <button class="tab-btn" id="ctab-sess" onclick="switchCmtTab('sess')">🗓 Заседания комитетов</button>
+  </div>
+  <div id="cpane-comp">
+    <div class="page-hdr"><span></span><div style="display:flex;gap:8px;align-items:center;"><a href="/org/{{ org.id }}/export/committees" class="btn btn-sm" style="background:#217346;color:#fff;">⬇ Excel</a>{% if editable %}<button class="btn btn-primary" onclick="openModal('addCmt')">+ Добавить комитет</button>{% endif %}</div></div>
+    {% for c in committees %}
+    <div class="card" style="margin-bottom:10px;">
+      <div class="acc-hdr" onclick="toggleAcc('cmt-{{ c.id }}')">
+        <div style="width:8px;height:8px;border-radius:50%;background:{{ c.color }};flex-shrink:0;"></div>
+        <div style="font-weight:700;flex:1;">{{ c.name }}</div>
+        {% set mems = cmt_members_map.get(c.id, []) %}
+        <span style="font-size:10px;color:var(--mid);">{{ mems|length }} чел.</span>
+        {% if editable %}
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditCmt({{ c.id }},'{{ c.name|e }}','{{ c.color }}')">✎</button>
+        {% endif %}
+        {% if editable and session.role=='admin' %}
+        <form method="post" action="/org/{{ org.id }}/committees/delete/{{ c.id }}" style="margin-left:8px;" onsubmit="return confirm('Удалить?')">
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation()">✕</button>
+        </form>
+        {% endif %}
+        <span style="color:var(--mid);margin-left:4px;">▾</span>
+      </div>
+      <div class="acc-body" id="cmt-{{ c.id }}">
+        {% set mems = cmt_members_map.get(c.id, []) %}
+        {% if mems %}
+        <table class="tbl" style="margin-bottom:10px;">
+          <thead><tr><th>№</th><th>ФИО</th><th>Роль</th>{% if editable %}<th></th>{% endif %}</tr></thead>
+          <tbody>{% for m in mems %}<tr>
+            <td style="color:var(--mid);font-size:10px;">{{ loop.index }}</td>
+            <td style="font-weight:700;">{{ m.full_name }}</td>
+            <td>{% if m.role=='Председатель комитета' %}<span class="badge b-psd">Председатель</span>{% else %}<span class="badge b-mem">Член</span>{% endif %}</td>
+            {% if editable %}<td>
+              <button class="btn btn-ghost btn-sm" onclick="openEditCmtMember({{ m.id }},{{ c.id }},'{{ m.full_name|e }}','{{ m.role|e }}')">✎</button>
+              <form method="post" action="/org/{{ org.id }}/committees/{{ c.id }}/members/delete/{{ m.id }}" style="display:inline;" onsubmit="return confirm('Удалить?')">
+                <button class="btn-link-danger">✕</button>
+              </form>
+            </td>{% endif %}
+          </tr>{% endfor %}</tbody>
+        </table>
+        {% else %}<p style="color:var(--mid);font-size:12px;margin-bottom:10px;">Состав не заполнен</p>{% endif %}
+        {% if editable %}<button class="btn btn-ghost btn-sm" onclick="openAddCmtMember({{ c.id }})">+ Добавить члена</button>{% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card" style="padding:40px;text-align:center;color:var(--mid);">Комитетов нет{% if editable %} — нажмите «+ Добавить комитет»{% endif %}</div>
+    {% endfor %}
+  </div>
+  <div id="cpane-sess" style="display:none;">
+    <div class="page-hdr"><span></span><div style="display:flex;gap:8px;align-items:center;"><a href="/org/{{ org.id }}/export/committees" class="btn btn-sm" style="background:#217346;color:#fff;">⬇ Excel</a>{% if editable %}<button class="btn btn-primary" onclick="openModal('addCmtSess')">+ Добавить заседание</button>{% endif %}</div></div>
+    {% for s in cmt_sessions %}
+    {% set s_cmts = sess_cmt_map.get(s.id, []) %}
+    <div class="card" style="margin-bottom:10px;">
+      <div class="acc-hdr" onclick="toggleAcc('cmts-{{ s.id }}')" style="border-left-color:var(--accent2);">
+        <div style="background:var(--cream2);border:1px solid var(--light);border-radius:3px;padding:3px 10px;font-size:10px;font-weight:800;color:var(--dark);">№ {{ loop.index }}</div>
+        <div style="font-weight:700;">{{ fmt(s.session_date) }}</div>
+        {% if s.protocol_num %}<span style="font-size:11px;color:var(--mid);">Прот. {{ s.protocol_num }}</span>{% endif %}
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-left:4px;">
+          {% for cid in s_cmts %}{% set c = cmt_dict.get(cid) %}{% if c %}
+          <span style="background:{{ c.color }}18;color:{{ c.color }};border:1px solid {{ c.color }}40;border-radius:2px;font-size:9px;font-weight:700;padding:1px 7px;">{{ c.name }}</span>
+          {% endif %}{% endfor %}
+        </div>
+        {% if editable and session.role=='admin' %}
+        <form method="post" action="/org/{{ org.id }}/cmt-sessions/delete/{{ s.id }}" style="margin-left:auto;" onsubmit="return confirmDelete('Удалить заседание комитетов от {{ fmt(s.session_date) }}? Все вопросы также будут удалены.')">
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation()">🗑 Удалить</button>
+        </form>
+        {% endif %}
+        <span style="color:var(--mid);margin-left:4px;">▾</span>
+      </div>
+      <div class="acc-body" id="cmts-{{ s.id }}">
+        {% for cid in s_cmts %}{% set c = cmt_dict.get(cid) %}{% if c %}
+        <div style="border-bottom:1px solid var(--light);padding:12px 0;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div style="width:7px;height:7px;border-radius:50%;background:{{ c.color }};"></div>
+            <strong style="color:{{ c.color }};font-size:12px;">{{ c.name }}</strong>
+          </div>
+
+          <div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px;">Вопросы повестки</div>
+          {% set agenda = sess_agenda_map.get((s.id, cid), []) %}
+          {% if agenda %}<table class="tbl" style="margin-bottom:8px;"><thead><tr><th>№</th><th>Вопрос</th><th>Статус</th><th>Примечание</th>{% if editable %}<th></th>{% endif %}</tr></thead><tbody>{% for a in agenda %}<tr><td style="color:var(--mid);font-size:10px;">{{ loop.index }}</td><td>{{ a.text or '—' }}</td><td>{% if a.status=='done' %}<span class="badge b-done">✓ Рассмотрен</span>{% else %}<span class="badge b-notdone">✗ Не рассмотрен</span>{% endif %}</td><td style="font-size:11px;color:var(--mid);font-style:italic;">{{ a.note or '' }}</td>{% if editable %}<td><form method="post" action="/org/{{ org.id }}/cmt-sessions/{{ s.id }}/agenda/delete/{{ a.id }}" style="display:inline;" onsubmit="return confirm('Удалить?')"><button class="btn-link-danger">✕</button></form></td>{% endif %}</tr>{% endfor %}</tbody></table>{% else %}<p style="color:var(--mid);font-size:12px;margin-bottom:8px;">Вопросов нет</p>{% endif %}
+          {% if editable %}<button class="btn btn-ghost btn-sm" onclick="openAddCmtAgenda({{ s.id }},{{ cid }})">+ Вопрос</button>{% endif %}
+        </div>
+        {% endif %}{% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card" style="padding:40px;text-align:center;color:var(--mid);">Заседаний комитетов нет</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ══ ACCOUNTABLE ══ -->
+<div id="pane-accountable" class="tab-pane" style="display:{% if tab=='accountable' %}block{% else %}none{% endif %};">
+  <div class="page-hdr">
+    <span style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">Подотчётные Совету директоров</span>
+    {% if editable %}<button class="btn btn-primary" onclick="openModal('addAcc')">+ Добавить</button>{% endif %}
+  </div>
+  <div class="card">
+    {% set ns = namespace(prev_org=None, idx=0) %}
+    <table class="tbl">
+      <thead><tr><th>№</th><th>ФИО</th><th>Должность</th><th>Служба / орган</th><th>Контакты</th><th>Срок</th><th>Реквизиты</th>{% if editable %}<th></th>{% endif %}</tr></thead>
+      <tbody>
+      {% for r in accountable|sort(attribute='org_name') %}
+      {% if r.org_name != ns.prev_org %}
+        {% set ns.prev_org = r.org_name %}
+        {% set ns.idx = 0 %}
+        <tr><td colspan="8" style="background:var(--dark);color:var(--cream);font-size:10px;font-weight:700;padding:6px 12px;letter-spacing:.6px;text-transform:uppercase;">{{ r.org_name or '—' }}</td></tr>
+      {% endif %}
+      {% set ns.idx = ns.idx + 1 %}
+      <tr>
+        <td style="color:var(--mid);font-size:10px;">{{ ns.idx }}</td>
+        <td style="font-weight:700;">{{ r.full_name }}</td>
+        <td>{% if r.position=='head' %}<span class="badge b-head">Руководитель</span>{% else %}<span class="badge b-emp">Работник</span>{% endif %}</td>
+        <td style="color:var(--mid);font-size:11px;">{{ r.org_name or '—' }}</td>
+        <td style="font-size:11px;">{% if r.phone %}<div>📞 {{ r.phone }}</div>{% endif %}{% if r.email %}<div>✉ {{ r.email }}</div>{% endif %}{% if not r.phone and not r.email %}—{% endif %}</td>
+        <td style="font-size:11px;">{{ fmt(r.date_from) }} — {{ fmt(r.date_to) if r.date_to else 'н.в.' }}</td>
+        <td style="font-size:10px;color:var(--mid);">{{ r.decision or '—' }}</td>
+        {% if editable %}
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" onclick="openEditAcc({{ r.id }},'{{ r.full_name|e }}','{{ r.position }}','{{ r.org_name|e }}','{{ r.phone|e }}','{{ r.email|e }}','{{ r.date_from or '' }}','{{ r.date_to or '' }}','{{ r.decision|e }}')">✎</button>
+          {% if session.role=='admin' %}
+          <form method="post" action="/org/{{ org.id }}/accountable/delete/{{ r.id }}" style="display:inline;" onsubmit="return confirm('Удалить?')">
+            <button class="btn btn-danger btn-sm">✕</button>
+          </form>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--mid);">Нет данных</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ BOARD ══ -->
+<div id="pane-board" class="tab-pane" style="display:{% if tab=='board' %}block{% else %}none{% endif %};">
+  <div class="page-hdr">
+    <span style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">Правление Общества</span>
+    {% if editable %}<button class="btn btn-primary" onclick="openModal('addBoard')">+ Добавить члена</button>{% endif %}
+  </div>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>№</th><th>ФИО</th><th>Должность</th><th>Срок полномочий</th>{% if editable %}<th></th>{% endif %}</tr></thead>
+      <tbody>
+      {% for r in board %}
+      <tr>
+        <td style="color:var(--mid);font-size:10px;">{{ loop.index }}</td>
+        <td style="font-weight:700;">{{ r.full_name }}</td>
+        <td style="color:var(--mid);font-size:11px;">{{ r.position or '—' }}</td>
+        <td style="font-size:11px;">{{ fmt(r.date_from) }} — {{ fmt(r.date_to) if r.date_to else 'н.в.' }}</td>
+        {% if editable %}
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" onclick="openEditBoard({{ r.id }},'{{ r.full_name|e }}','{{ r.position|e }}','{{ r.date_from or '' }}','{{ r.date_to or '' }}')">✎</button>
+          {% if session.role=='admin' %}
+          <form method="post" action="/org/{{ org.id }}/board/delete/{{ r.id }}" style="display:inline;" onsubmit="return confirmDelete('Удалить члена Правления: {{ r.full_name|e }}?')">
+            <button class="btn btn-danger btn-sm">🗑</button>
+          </form>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--mid);">Нет данных</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ DOCUMENTS ══ -->
+<div id="pane-documents" class="tab-pane" style="display:{% if tab=='documents' %}block{% else %}none{% endif %};">
+  <div class="page-hdr">
+    <span style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">Нормативные документы</span>
+    {% if editable %}<button class="btn btn-primary" onclick="openModal('addDoc')">+ Добавить документ</button>{% endif %}
+  </div>
+  {% for d in docs %}
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;" onclick="toggleAcc('doc-{{ d.id }}')">
+      <div style="font-size:20px;">{% if d.doc_type=='Положение' %}📄{% elif d.doc_type=='Регламент' %}📑{% elif d.doc_type=='Политика' %}🏛{% else %}📋{% endif %}</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:13px;">{{ d.name }}</div>
+        <div style="font-size:10px;color:var(--mid);margin-top:2px;">{{ d.doc_type }}{% if d.date_approved %} · {{ fmt(d.date_approved) }}{% endif %}{% if d.decision %} · {{ d.decision }}{% endif %}</div>
+        {% if d.file_name %}<div style="font-size:9px;color:var(--mid);margin-top:2px;">📎 {{ d.file_name }}</div>{% endif %}
+      </div>
+      {% if d.file_name %}<span style="font-size:10px;color:var(--accent2);font-weight:700;">👁 Просмотр ▾</span>{% endif %}
+      {% if editable and session.role=='admin' %}
+      <form method="post" action="/org/{{ org.id }}/documents/delete/{{ d.id }}" style="margin-left:8px;" onsubmit="return confirm('Удалить?')">
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation()">✕</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if d.file_name %}
+    <div class="doc-preview-pane" id="doc-{{ d.id }}">
+      {% if d.file_mime and 'pdf' in d.file_mime %}
+      <iframe src="/org/{{ org.id }}/documents/view/{{ d.id }}" style="width:100%;height:600px;border:none;display:block;"></iframe>
+      {% else %}
+      <div style="padding:24px;text-align:center;color:var(--mid);">
+        <div style="font-size:24px;margin-bottom:8px;">📎</div>
+        <a href="/org/{{ org.id }}/documents/view/{{ d.id }}" download="{{ d.file_name }}" style="display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:var(--dark);color:var(--cream);border-radius:4px;text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">⬇ Скачать</a>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="card" style="padding:40px;text-align:center;color:var(--mid);">Документов нет</div>
+  {% endfor %}
+</div>
+
+<!-- ══ MODALS ══ -->
+{% if editable %}
+<!-- Add Session -->
+<div class="modal-bg" id="addSession"><div class="modal">
+  <div class="modal-title">Добавить заседание СД</div>
+  <form method="post" action="/org/{{ org.id }}/sessions/add">
+    <div class="fgrow3">
+      <div class="fg"><label>Дата</label><input name="session_date" type="date" required></div>
+      <div class="fg"><label>Форма</label><select name="format"><option>Очное</option><option>Заочное</option></select></div>
+      <div class="fg"><label>Вид</label><select name="order_type"><option>Очередное</option><option>Внеочередное</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addSession')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Создать</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Agenda DOCX Preview Modal -->
+<div class="modal-bg" id="agendaPreviewModal" onclick="if(event.target===this)closeModal('agendaPreviewModal')">
+  <div class="modal" style="width:900px;max-width:96vw;max-height:92vh;overflow-y:auto;">
+    <div class="modal-title" style="display:flex;align-items:center;gap:10px;">
+      <span>📄 Предпросмотр повестки</span>
+      <span style="font-size:10px;font-weight:400;color:#888;margin-left:4px;">Проверьте и отредактируйте данные перед сохранением</span>
+      <button type="button" onclick="closeModal('agendaPreviewModal')" style="margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer;color:#999;">✕</button>
+    </div>
+    <!-- Лоадер -->
+    <div id="agendaParseLoader" style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;gap:16px;">
+      <div style="width:40px;height:40px;border:3px solid #e0e0e0;border-top-color:#1565c0;border-radius:50%;animation:spin .8s linear infinite;"></div>
+      <div style="font-size:13px;color:#666;">Читаем документ и извлекаем данные...</div>
+    </div>
+    <div id="agendaPreviewContent"></div>
+  </div>
+</div>
+
+<!-- Add Agenda -->
+<div class="modal-bg" id="addAgenda"><div class="modal">
+  <div class="modal-title">Добавить вопрос повестки</div>
+  <form method="post" id="addAgendaForm">
+    <input type="hidden" name="open_sess_id" id="addAgendaSessionId">
+    <div class="fg"><label>Вопрос</label><textarea name="text" rows="3" placeholder="Описание вопроса..."></textarea></div>
+    <div class="fgrow">
+      <div class="fg"><label>Статус</label><select name="status"><option value="done">✓ Рассмотрен</option><option value="notdone">✗ Не рассмотрен</option></select></div>
+      <div class="fg"><label>Примечание</label><input name="note" placeholder="(если не рассмотрен)"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addAgenda')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Добавить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Edit Agenda -->
+<div class="modal-bg" id="editAgenda"><div class="modal">
+  <div class="modal-title">Редактировать вопрос</div>
+  <form method="post" id="editAgendaForm">
+    <div class="fg"><label>Вопрос</label><textarea name="text" id="ea_text" rows="3"></textarea></div>
+    <div class="fgrow">
+      <div class="fg"><label>Статус</label><select name="status" id="ea_status"><option value="done">✓ Рассмотрен</option><option value="notdone">✗ Не рассмотрен</option></select></div>
+      <div class="fg"><label>Примечание</label><input name="note" id="ea_note"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('editAgenda')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Add Member -->
+<div class="modal-bg" id="addMember"><div class="modal">
+  <div class="modal-title">Добавить члена СД</div>
+  <form method="post" action="/org/{{ org.id }}/members/add">
+    <div class="fg"><label>ФИО</label><input name="full_name" required placeholder="Иванов Иван Иванович"></div>
+    <div class="fgrow">
+      <div class="fg"><label>Роль</label><select name="role"><option value="psd">Председатель СД</option><option value="mem" selected>Член СД</option></select></div>
+      <div class="fg"><label>Должность</label><input name="position" placeholder="Заместитель Председателя..."></div>
+    </div>
+    <div class="fg" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" name="is_independent" value="1" id="isind_a" style="width:15px;height:15px;accent-color:var(--accent);">
+      <label for="isind_a" style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;">Независимый директор</label>
+    </div>
+    <div class="fgrow">
+      <div class="fg"><label>Дата начала</label><input name="date_from" type="date"></div>
+      <div class="fg"><label>Дата окончания</label><input name="date_to" type="date"></div>
+    </div>
+    <div class="fg"><label>Реквизиты решения</label><input name="decision" placeholder="Решение ЕАО № ___ от дд.мм.гггг"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addMember')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Edit Member -->
+<div class="modal-bg" id="editMember"><div class="modal">
+  <div class="modal-title">Редактировать члена СД</div>
+  <form method="post" id="editMemberForm">
+    <div class="fg"><label>ФИО</label><input name="full_name" id="em_fio" required></div>
+    <div class="fgrow">
+      <div class="fg"><label>Роль</label><select name="role" id="em_role"><option value="psd">Председатель СД</option><option value="mem">Член СД</option></select></div>
+      <div class="fg"><label>Должность</label><input name="position" id="em_pos"></div>
+    </div>
+    <div class="fg" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" name="is_independent" value="1" id="em_isind" style="width:15px;height:15px;accent-color:var(--accent);">
+      <label for="em_isind" style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;">Независимый директор</label>
+    </div>
+    <div class="fgrow">
+      <div class="fg"><label>Дата начала</label><input name="date_from" id="em_from" type="date"></div>
+      <div class="fg"><label>Дата окончания</label><input name="date_to" id="em_to" type="date"></div>
+    </div>
+    <div class="fg"><label>Реквизиты решения</label><input name="decision" id="em_dec"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('editMember')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Add Committee -->
+<div class="modal-bg" id="addCmt"><div class="modal">
+  <div class="modal-title">Добавить комитет</div>
+  <form method="post" action="/org/{{ org.id }}/committees/add">
+    <div class="fgrow">
+      <div class="fg"><label>Название</label><input name="name" required placeholder="Комитет по аудиту"></div>
+      <div class="fg"><label>Цвет</label><input name="color" type="color" value="#7ab317" style="height:40px;cursor:pointer;width:100%;"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addCmt')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Добавить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Add Cmt Member -->
+<div class="modal-bg" id="addCmtMember"><div class="modal">
+  <div class="modal-title">Добавить члена комитета</div>
+  <form method="post" id="addCmtMemberForm">
+    <div class="fg"><label>ФИО</label><input name="full_name" required placeholder="Иванов Иван Иванович"></div>
+    <div class="fg"><label>Роль</label><select name="role"><option>Председатель комитета</option><option selected>Член комитета</option></select></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addCmtMember')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Добавить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Edit Cmt -->
+<div class="modal-bg" id="editCmt"><div class="modal">
+  <div class="modal-title">Редактировать комитет</div>
+  <form method="post" id="editCmtForm">
+    <div class="fgrow">
+      <div class="fg"><label>Название</label><input name="name" id="ecmt_name" required></div>
+      <div class="fg"><label>Цвет</label><input name="color" id="ecmt_color" type="color" style="height:40px;cursor:pointer;width:100%;"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('editCmt')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Edit Cmt Member -->
+<div class="modal-bg" id="editCmtMember"><div class="modal">
+  <div class="modal-title">Редактировать члена комитета</div>
+  <form method="post" id="editCmtMemberForm">
+    <div class="fg"><label>ФИО</label><input name="full_name" id="ecmtm_name" required></div>
+    <div class="fg"><label>Роль</label><select name="role" id="ecmtm_role"><option>Председатель комитета</option><option>Член комитета</option></select></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('editCmtMember')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Add Cmt Session -->
+<div class="modal-bg" id="addCmtSess"><div class="modal" style="width:560px;">
+  <div class="modal-title">Добавить заседание комитетов</div>
+  <form method="post" action="/org/{{ org.id }}/cmt-sessions/add">
+    <div class="fgrow">
+      <div class="fg"><label>Дата</label><input name="session_date" type="date" required></div>
+      <div class="fg"><label>Номер протокола</label><input name="protocol_num" placeholder="№ протокола"></div>
+    </div>
+    <div class="fg"><label>Участвующие комитеты</label>
+      {% if committees %}
+      {% for c in committees %}
+      <label style="display:flex;align-items:center;gap:8px;padding:7px 0;cursor:pointer;border-bottom:1px solid var(--light);">
+        <input type="checkbox" name="committee_ids" value="{{ c.id }}" style="accent-color:{{ c.color }};width:15px;height:15px;">
+        <span style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:{{ c.color }};display:inline-block;"></span><span style="font-weight:600;color:{{ c.color }};">{{ c.name }}</span></span>
+      </label>
+      {% endfor %}
+      {% else %}<p style="color:var(--danger);font-size:12px;">Сначала добавьте комитеты</p>{% endif %}
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addCmtSess')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Создать</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Add Cmt Agenda -->
+<div class="modal-bg" id="addCmtAgenda"><div class="modal">
+  <div class="modal-title">Добавить вопрос повестки комитета</div>
+  <form method="post" id="addCmtAgendaForm">
+    <input type="hidden" name="committee_id" id="cag_cid">
+    <div class="fg"><label>Вопрос</label><textarea name="text" rows="3" placeholder="Описание вопроса..."></textarea></div>
+    <div class="fgrow">
+      <div class="fg"><label>Статус</label><select name="status"><option value="done">✓ Рассмотрен</option><option value="notdone">✗ Не рассмотрен</option></select></div>
+      <div class="fg"><label>Примечание</label><input name="note"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addCmtAgenda')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Добавить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Add Accountable -->
+<div class="modal-bg" id="addAcc"><div class="modal">
+  <div class="modal-title">Добавить сотрудника</div>
+  <form method="post" action="/org/{{ org.id }}/accountable/add">
+    <div class="fg"><label>ФИО</label><input name="full_name" required placeholder="Иванов Иван Иванович"></div>
+    <div class="fgrow">
+      <div class="fg"><label>Должность</label><select name="position" id="add_pos" onchange="checkHint()"><option value="head">Руководитель</option><option value="emp" selected>Работник</option></select></div>
+      <div class="fg"><label>Служба / орган</label><input name="org_name" id="add_org" oninput="checkHint()" placeholder="Служба внутреннего аудита"></div>
+    </div>
+    <div class="fgrow">
+      <div class="fg"><label>Телефон</label><input name="phone" placeholder="+7 (___) ___-__-__"></div>
+      <div class="fg"><label>E-mail</label><input name="email" type="email" placeholder="example@org.kz"></div>
+    </div>
+    <div id="acc_hint" style="display:none;" class="hint-box">
+      💡 У руководителя этой службы: срок <b id="hint_dates"></b>, реквизиты: <b id="hint_dec"></b>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button type="button" class="btn btn-accent btn-sm" onclick="applyHint()">Применить</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('acc_hint').style.display='none'">Вручную</button>
+      </div>
+    </div>
+    <div class="fgrow">
+      <div class="fg"><label>Срок с</label><input name="date_from" id="add_from" type="date"></div>
+      <div class="fg"><label>Срок по</label><input name="date_to" id="add_to" type="date"></div>
+    </div>
+    <div class="fg"><label>Реквизиты решения</label><input name="decision" id="add_dec" placeholder="Решение № ___ от дд.мм.гггг"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addAcc')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Edit Accountable -->
+<div class="modal-bg" id="editAcc"><div class="modal">
+  <div class="modal-title">Редактировать сотрудника</div>
+  <form method="post" id="editAccForm">
+    <div class="fg"><label>ФИО</label><input name="full_name" id="eac_fio" required></div>
+    <div class="fgrow">
+      <div class="fg"><label>Должность</label><select name="position" id="eac_pos"><option value="head">Руководитель</option><option value="emp">Работник</option></select></div>
+      <div class="fg"><label>Служба / орган</label><input name="org_name" id="eac_org"></div>
+    </div>
+    <div class="fgrow">
+      <div class="fg"><label>Телефон</label><input name="phone" id="eac_phone"></div>
+      <div class="fg"><label>E-mail</label><input name="email" id="eac_email" type="email"></div>
+    </div>
+    <div class="fgrow">
+      <div class="fg"><label>Срок с</label><input name="date_from" id="eac_from" type="date"></div>
+      <div class="fg"><label>Срок по</label><input name="date_to" id="eac_to" type="date"></div>
+    </div>
+    <div class="fg"><label>Реквизиты решения</label><input name="decision" id="eac_dec"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('editAcc')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Add Board -->
+<div class="modal-bg" id="addBoard"><div class="modal">
+  <div class="modal-title">Добавить члена Правления</div>
+  <form method="post" action="/org/{{ org.id }}/board/add">
+    <div class="fg"><label>ФИО</label><input name="full_name" required placeholder="Иванов Иван Иванович"></div>
+    <div class="fg"><label>Должность</label><input name="position" placeholder="Председатель Правления"></div>
+    <div class="fgrow">
+      <div class="fg"><label>Срок с</label><input name="date_from" type="date"></div>
+      <div class="fg"><label>Срок по</label><input name="date_to" type="date"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addBoard')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Edit Board -->
+<div class="modal-bg" id="editBoard"><div class="modal">
+  <div class="modal-title">Редактировать члена Правления</div>
+  <form method="post" id="editBoardForm">
+    <div class="fg"><label>ФИО</label><input name="full_name" id="eb_fio" required></div>
+    <div class="fg"><label>Должность</label><input name="position" id="eb_pos"></div>
+    <div class="fgrow">
+      <div class="fg"><label>Срок с</label><input name="date_from" id="eb_from" type="date"></div>
+      <div class="fg"><label>Срок по</label><input name="date_to" id="eb_to" type="date"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('editBoard')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- Add Document -->
+<div class="modal-bg" id="addDoc"><div class="modal">
+  <div class="modal-title">Добавить документ</div>
+  <form method="post" action="/org/{{ org.id }}/documents/add" enctype="multipart/form-data">
+    <div class="fg"><label>Наименование</label><input name="name" required placeholder="Положение о Совете директоров"></div>
+    <div class="fgrow">
+      <div class="fg"><label>Тип</label><select name="doc_type"><option>Положение</option><option>Типовые правила</option><option>Регламент</option><option>Политика</option><option>Иное</option></select></div>
+      <div class="fg"><label>Дата утверждения</label><input name="date_approved" type="date"></div>
+    </div>
+    <div class="fg"><label>Реквизиты акта</label><input name="decision" placeholder="Решение СД № ___ от дд.мм.гггг"></div>
+    <div class="fg"><label>Файл (PDF, Word, Excel)</label>
+      <div class="file-drop" onclick="document.getElementById('doc_file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor=''" ondrop="handleDrop(event)">
+        <input type="file" id="doc_file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display:none;" onchange="showFile(this)">
+        <div style="font-size:20px;margin-bottom:4px;">📎</div>
+        <div id="dropText" style="font-size:11px;color:var(--mid);">📎 Нажмите или перетащите файл сюда</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('addDoc')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Добавить</button>
+    </div>
+  </form>
+</div></div>
+{% endif %}
+
+<!-- Edit EA Modal -->
+<div class="modal-bg" id="editEA"><div class="modal" style="width:560px;">
+  <div class="modal-title">Редактировать решение ЕА</div>
+  <form method="post" id="editEAForm" enctype="multipart/form-data">
+    <div class="fg"><label>Наименование решения</label><input name="title" id="eea_title" required></div>
+    <div class="fg"><label>Наименование вопроса</label><textarea name="question_text" id="eea_q" rows="2"></textarea></div>
+    <div class="fgrow">
+      <div class="fg"><label>Дата решения</label><input name="decision_date" id="eea_date" type="date"></div>
+      <div class="fg"><label>Реквизиты</label><input name="requisites" id="eea_req" placeholder="Протокол № __/__ от дд.мм.гггг"></div>
+    </div>
+    <div id="eea_current_file" style="display:none;margin-bottom:10px;">
+      <div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Текущий файл</div>
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--cream2);border:1px solid var(--light);border-radius:4px;">
+        <span style="font-size:14px;">📎</span>
+        <span id="eea_fname" style="font-size:11px;flex:1;"></span>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;color:var(--danger);">
+          <input type="checkbox" name="delete_file" value="1" style="accent-color:var(--danger);"> Удалить файл
+        </label>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Заменить / прикрепить файл</label>
+      <div class="file-drop">
+        <input type="file" id="eea_new_file" name="file" accept=".pdf,.doc,.docx" style="display:none;">
+        <div style="font-size:16px;margin-bottom:3px;">📎</div>
+        <div id="eeaFileText" style="font-size:11px;color:var(--mid);">📎 Нажмите или перетащите файл сюда</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('editEA')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+
+<!-- ══ WORKPLAN ══ -->
+<div id="pane-workplan" class="tab-pane" style="display:{% if tab=='workplan' %}block{% else %}none{% endif %};">
+  <div class="page-hdr">
+    <span style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">📅 План работы Совета директоров</span>
+  </div>
+  {% if workplan and workplan.file_name %}
+  <div class="card" style="margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;">
+      <div style="font-size:24px;">📄</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:13px;">{{ workplan.file_name }}</div>
+        <div style="font-size:10px;color:var(--mid);margin-top:2px;">Загружен: {{ fmt(workplan.uploaded_at) }}</div>
+      </div>
+      <a href="/org/{{ org.id }}/workplan/view" target="_blank" class="btn btn-accent btn-sm">👁 Просмотр</a>
+      {% if editable %}
+      <form method="post" action="/org/{{ org.id }}/workplan/delete" onsubmit="return confirm('Удалить план работы?')">
+        <button class="btn btn-danger btn-sm">✕ Удалить</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if workplan.file_mime and 'pdf' in workplan.file_mime %}
+    <iframe src="/org/{{ org.id }}/workplan/view" style="width:100%;height:600px;border:none;border-top:1px solid var(--light);display:block;"></iframe>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="card" style="padding:40px;text-align:center;color:var(--mid);">
+    <div style="font-size:32px;margin-bottom:10px;">📅</div>
+    <div style="font-size:13px;margin-bottom:6px;">План работы СД не загружен</div>
+    {% if editable %}<div style="font-size:11px;">Загрузите подписанный план работы на текущий год</div>{% endif %}
+  </div>
+  {% endif %}
+  {% if editable %}
+  <div style="margin-top:14px;">
+    <form method="post" action="/org/{{ org.id }}/workplan/upload" enctype="multipart/form-data">
+      <div class="file-drop" onclick="document.getElementById('wp_file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor=''" ondrop="handleDropWP(event)">
+        <input type="file" id="wp_file" name="file" accept=".pdf,.doc,.docx" style="display:none;" onchange="showFileWP(this)">
+        <div style="font-size:20px;margin-bottom:4px;">📎</div>
+        <div id="wpDropText" style="font-size:11px;color:var(--mid);">📎 Нажмите или перетащите PDF/Word файл сюда</div>
+      </div>
+      <div style="margin-top:10px;text-align:right;">
+        <button type="submit" class="btn btn-primary" id="wpSubmit" style="display:none;">⬆ Загрузить план</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══ EA DECISIONS ══ -->
+<div id="pane-ea" class="tab-pane" style="display:{% if tab=='ea' %}block{% else %}none{% endif %};">
+  <div class="page-hdr">
+    <span style="font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.8px;">📄 Решения Единственного акционера</span>
+    {% if editable %}<button class="btn btn-primary" onclick="openModal('addEA')">+ Добавить выписку</button>{% endif %}
+  </div>
+  {% for ea in ea_decisions %}
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
+      <div style="font-size:20px;">📄</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;">{{ ea.title }}</div>
+        {% if ea.question_text %}<div style="font-size:11px;color:var(--dark);margin-top:3px;font-style:italic;">{{ ea.question_text }}</div>{% endif %}
+        <div style="font-size:10px;color:var(--mid);margin-top:3px;">
+          {% if ea.decision_date %}Дата: {{ fmt(ea.decision_date) }}{% endif %}
+          {% if ea.requisites %} · {{ ea.requisites }}{% endif %}
+          {% if ea.created_at %} · Добавлено: {{ fmt(ea.created_at) }}{% endif %}
+        </div>
+        {% if ea.file_name %}<div style="font-size:9px;color:var(--mid);margin-top:2px;">📎 {{ ea.file_name }}</div>{% endif %}
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        {% if ea.file_name %}
+        <a href="/org/{{ org.id }}/ea/view/{{ ea.id }}" target="_blank" class="btn btn-ghost btn-sm">👁 Просмотр</a>
+        {% endif %}
+        <a href="/org/{{ org.id }}/ea/letter/{{ ea.id }}" target="_blank" class="btn btn-accent btn-sm">✉ Драфт письма</a>
+        {% if editable %}
+        <button type="button" class="btn btn-ghost btn-sm"
+          onclick="
+            document.getElementById('eea_title').value=this.getAttribute('data-title');
+            document.getElementById('eea_date').value=this.getAttribute('data-date');
+            document.getElementById('eea_q').value=this.getAttribute('data-q');
+            document.getElementById('eea_req').value=this.getAttribute('data-req');
+            var fn=this.getAttribute('data-fname');
+            document.getElementById('eea_fname').textContent=fn;
+            document.getElementById('eea_current_file').style.display=fn?'block':'none';
+            document.getElementById('eeaFileText').textContent='📎 Нажмите или перетащите файл сюда';
+            document.getElementById('editEAForm').action='/org/{{ org.id }}/ea/edit/'+this.getAttribute('data-id');
+            document.getElementById('editEA').classList.add('open');
+          "
+          data-id="{{ ea.id }}"
+          data-title="{{ ea.title }}"
+          data-date="{{ ea.decision_date or '' }}"
+          data-q="{{ ea.question_text or '' }}"
+          data-req="{{ ea.requisites or '' }}"
+          data-fname="{{ ea.file_name or '' }}">✎ Изменить</button>
+        <form method="post" action="/org/{{ org.id }}/ea/delete/{{ ea.id }}" onsubmit="return confirmDelete('Удалить решение ЕА: &quot;{{ ea.title|e }}&quot;?')">
+          <button class="btn btn-danger btn-sm">🗑</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% if ea.file_name and ea.file_name.endswith('.pdf') %}
+    <div class="doc-preview-pane" id="ea-{{ ea.id }}">
+      <iframe src="/org/{{ org.id }}/ea/view/{{ ea.id }}" style="width:100%;height:500px;border:none;"></iframe>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="card" style="padding:40px;text-align:center;color:var(--mid);">Выписок нет{% if editable %} — нажмите «+ Добавить выписку»{% endif %}</div>
+  {% endfor %}
+
+  {% if editable %}
+  <div class="modal-bg" id="addEA"><div class="modal" style="width:560px;">
+    <div class="modal-title">Добавить решение ЕА / выписку</div>
+    <form method="post" action="/org/{{ org.id }}/ea/add" enctype="multipart/form-data">
+      <div class="fg"><label>Наименование решения</label><input name="title" required placeholder="Решение ЕА №___ от дд.мм.гггг"></div>
+      <div class="fg"><label>Наименование вопроса</label><textarea name="question_text" rows="2" placeholder="Об утверждении Положения о Совете директоров акционерного общества «...»"></textarea></div>
+      <div class="fgrow">
+        <div class="fg"><label>Дата решения</label><input name="decision_date" type="date"></div>
+        <div class="fg"><label>Реквизиты</label><input name="requisites" placeholder="Протокол № __/__ от дд.мм.гггг"></div>
+      </div>
+      <div class="fg"><label>Файл (выписка PDF/Word)</label>
+        <div class="file-drop">
+          <input type="file" id="ea_file" name="file" accept=".pdf,.doc,.docx" style="display:none;">
+          <div style="font-size:18px;margin-bottom:4px;">📎</div>
+          <div id="eaDropText" style="font-size:11px;color:var(--mid);">📎 Нажмите или перетащите файл сюда</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addEA')">Отмена</button>
+        <button type="submit" class="btn btn-primary">Добавить</button>
+      </div>
+    </form>
+  </div></div>
+  {% endif %}
+</div>
+
+
+<!-- Edit Session Modal -->
+{% if editable %}
+<div class="modal-bg" id="editSession"><div class="modal">
+  <div class="modal-title">Редактировать заседание СД</div>
+  <form method="post" id="editSessionForm">
+    <div class="fgrow3">
+      <div class="fg"><label>Дата</label><input name="session_date" id="es_date" type="date" required></div>
+      <div class="fg"><label>Форма</label><select name="format" id="es_format">
+        <option>Очное</option><option>Заочное</option>
+      </select></div>
+      <div class="fg"><label>Вид</label><select name="order_type" id="es_order">
+        <option>Очередное</option><option>Внеочередное</option>
+      </select></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('editSession')">Отмена</button>
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div></div>
+{% endif %}
+
+<!-- ══ CALENDAR ══ -->
+<div id="pane-calendar" class="tab-pane" style="display:{% if tab=='calendar' %}block{% else %}none{% endif %};">
+<style>
+.cal-colors{--c-sess:#2563eb;--c-cmt:#be185d;--c-member:#7ab317;--c-board:#e65100;--c-acc:#9333ea;}
+.cal-wrap{font-family:'Montserrat',sans-serif;}
+.cal-year-tabs{display:flex;gap:4px;margin-bottom:10px;}
+.cal-yt{padding:5px 14px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--light);background:var(--cream2);color:var(--mid);}
+.cal-yt.active{background:var(--dark);color:var(--cream);border-color:var(--dark);}
+.cal-legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid var(--light);border-radius:6px;}
+.cal-leg{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;}
+.cal-leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.cal-nav-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.cal-nav-btns{display:flex;align-items:center;gap:8px;}
+.cal-nav-btns button{background:var(--cream2);border:1px solid var(--light);border-radius:4px;padding:5px 10px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;color:var(--dark);}
+.cal-cur-month{font-size:13px;font-weight:800;color:var(--dark);min-width:150px;text-align:center;}
+.cal-today-btn{background:var(--accent);color:var(--dark);border:none;border-radius:4px;padding:5px 14px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;}
+.cal-grid-wrap{background:#fff;border:1px solid var(--light);border-radius:6px;overflow:hidden;}
+.cal-wdays{display:grid;grid-template-columns:repeat(7,1fr);background:var(--dark);}
+.cal-wd{padding:6px;text-align:center;font-size:9px;font-weight:700;color:rgba(245,240,232,.6);text-transform:uppercase;}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--light);}
+.cal-day{background:var(--cream);min-height:75px;padding:4px;position:relative;}
+.cal-day.cal-other{background:#f8f6f0;opacity:.5;}
+.cal-day.cal-today{background:#f0f7e8;}
+.cal-day.cal-today .cal-dnum{background:var(--accent);color:var(--dark);border-radius:50%;}
+.cal-dnum{font-size:10px;font-weight:700;color:var(--mid);margin-bottom:2px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+.cal-day.cal-wend .cal-dnum{color:#ef4444;}
+.cal-ev{border-radius:2px;padding:1px 4px;font-size:9px;font-weight:600;color:#fff;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;line-height:1.5;}
+.cal-ev:hover{opacity:.85;}
+.cal-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px;}
+.cal-sum{background:#fff;border:1px solid var(--light);border-radius:6px;padding:9px 12px;border-left:3px solid;}
+.cal-sum-v{font-size:18px;font-weight:900;color:var(--dark);}
+.cal-sum-l{font-size:9px;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-top:1px;}
+.cal-tip{position:fixed;background:var(--dark);color:#fff;padding:8px 12px;border-radius:6px;font-size:11px;z-index:9000;pointer-events:none;display:none;max-width:260px;line-height:1.6;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+.cal-tip-title{font-weight:700;margin-bottom:2px;}
+</style>
+
+<div class="cal-wrap cal-colors">
+  <div class="cal-year-tabs" id="calYearTabs"></div>
+
+  <div class="cal-legend">
+    <div class="cal-leg"><div class="cal-leg-dot" style="background:#2563eb"></div>Заседания СД</div>
+    <div class="cal-leg"><div class="cal-leg-dot" style="background:#be185d"></div>Заседания комитетов</div>
+    <div class="cal-leg"><div class="cal-leg-dot" style="background:#7ab317"></div>Сроки полномочий СД</div>
+    <div class="cal-leg"><div class="cal-leg-dot" style="background:#e65100"></div>Сроки полномочий Правления</div>
+    <div class="cal-leg"><div class="cal-leg-dot" style="background:#9333ea"></div>Сроки подотчётных</div>
+  </div>
+
+  <div class="cal-nav-row">
+    <div class="cal-nav-btns">
+      <button onclick="calPrev()">‹</button>
+      <div class="cal-cur-month" id="calCurMonth"></div>
+      <button onclick="calNext()">›</button>
+    </div>
+    <button class="cal-today-btn" onclick="calToday()">Сегодня</button>
+  </div>
+
+  <div class="cal-grid-wrap">
+    <div class="cal-wdays">
+      <div class="cal-wd">Пн</div><div class="cal-wd">Вт</div><div class="cal-wd">Ср</div>
+      <div class="cal-wd">Чт</div><div class="cal-wd">Пт</div>
+      <div class="cal-wd" style="color:rgba(239,68,68,.7);">Сб</div>
+      <div class="cal-wd" style="color:rgba(239,68,68,.7);">Вс</div>
+    </div>
+    <div class="cal-days" id="calDaysGrid"></div>
+  </div>
+
+  <div class="cal-summary">
+    <div class="cal-sum" style="border-left-color:#2563eb"><div class="cal-sum-v" id="csum0">0</div><div class="cal-sum-l">Заседаний СД</div></div>
+    <div class="cal-sum" style="border-left-color:#be185d"><div class="cal-sum-v" id="csum1">0</div><div class="cal-sum-l">Заседаний комитетов</div></div>
+    <div class="cal-sum" style="border-left-color:#7ab317"><div class="cal-sum-v" id="csum2">0</div><div class="cal-sum-l">Сроков СД</div></div>
+    <div class="cal-sum" style="border-left-color:#e65100"><div class="cal-sum-v" id="csum3">0</div><div class="cal-sum-l">Сроков Правления</div></div>
+    <div class="cal-sum" style="border-left-color:#9333ea"><div class="cal-sum-v" id="csum4">0</div><div class="cal-sum-l">Сроков подотчётных</div></div>
+  </div>
+</div>
+<div class="cal-tip" id="calTip"></div>
+</div>
+
+<!-- ══ IMPORT ══ -->
+{% if editable %}
+<div id="pane-import" class="tab-pane" style="display:{% if tab=='import' %}block{% else %}none{% endif %};">
+
+  <div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:6px;padding:12px 16px;font-size:11px;color:#1565c0;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;">
+    <span style="font-size:16px;">ℹ️</span>
+    <div>Скачайте шаблон Excel, заполните данные и загрузите обратно. Система проверит данные и покажет предпросмотр перед сохранением.</div>
+  </div>
+
+  <!-- Steps -->
+  <div style="display:flex;gap:8px;margin-bottom:20px;">
+    {% for step in [('1','Скачай шаблон'),('2','Заполни данные'),('3','Загрузи файл'),('4','Проверь и подтверди')] %}
+    <div style="flex:1;background:#fff;border:1px solid var(--light);border-radius:6px;padding:12px;text-align:center;">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--dark);color:var(--cream);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;">{{ step[0] }}</div>
+      <div style="font-size:10px;font-weight:600;color:var(--mid);">{{ step[1] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Template cards -->
+  <div style="font-size:9px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">📋 Шаблоны для импорта</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+    {% for tmpl in [
+      ('📋','Заседания СД','Дата, форма, вид, вопросы повестки','sessions'),
+      ('👤','Состав СД','ФИО, роль, должность, сроки, реквизиты','members'),
+      ('⚖️','Состав Правления','ФИО, должность, сроки полномочий','board'),
+      ('🏢','Подотчётные СД','ФИО, служба, должность, телефон','accountable'),
+      ('📄','Решения ЕА','Наименование, дата, вопрос, реквизиты','ea'),
+      ('🗂','Состав комитетов','Комитет, ФИО, роль','committees'),
+    ] %}
+    <div style="background:#fff;border:1px solid var(--light);border-radius:8px;padding:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="font-size:22px;">{{ tmpl[0] }}</span>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--dark);">{{ tmpl[1] }}</div>
+          <div style="font-size:10px;color:var(--mid);margin-top:2px;">{{ tmpl[2] }}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <a href="/org/{{ org.id }}/import/template/{{ tmpl[3] }}" class="btn btn-sm" style="background:#217346;color:#fff;text-decoration:none;">⬇ Шаблон</a>
+        <button class="btn btn-ghost btn-sm" onclick="openImportModal('{{ tmpl[3] }}','{{ tmpl[1] }}')">⬆ Загрузить</button>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+{% endif %}
+
+<!-- Import Modal -->
+<div class="modal-bg" id="importModal"><div class="modal" style="width:500px;">
+  <div class="modal-title" id="importModalTitle">📥 Импорт</div>
+  <form method="post" id="importForm" enctype="multipart/form-data">
+    <div class="fg">
+      <div class="file-drop"
+        onclick="document.getElementById('importFile').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='#f0f7e8';"
+        ondragleave="this.style.borderColor='';this.style.background='';"
+        ondrop="event.preventDefault();var f=event.dataTransfer.files[0];if(f){var dt=new DataTransfer();dt.items.add(f);document.getElementById('importFile').files=dt.files;document.getElementById('importFileText').textContent='✅ '+f.name;}this.style.borderColor='';this.style.background='';">
+        <input type="file" id="importFile" name="file" accept=".xlsx,.xls" style="display:none;"
+          onchange="document.getElementById('importFileText').textContent=this.files[0]?'✅ '+this.files[0].name:'📎 Нажмите или перетащите Excel файл сюда'">
+        <div style="font-size:28px;margin-bottom:8px;">📊</div>
+        <div id="importFileText" style="font-size:12px;color:var(--mid);">📎 Нажмите или перетащите Excel файл сюда</div>
+        <div style="font-size:10px;color:var(--light);margin-top:4px;">Поддерживается .xlsx, .xls</div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:#1565c0;padding:10px 12px;background:#e3f2fd;border-radius:4px;margin-bottom:12px;">
+      💡 После загрузки данные сразу сохранятся. Используйте шаблон чтобы избежать ошибок.
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('importModal')">Отмена</button>
+      <button type="submit" class="btn btn-primary">📤 Загрузить</button>
+    </div>
+  </form>
+</div></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditEA(eid, title, date, q, req){
+  document.getElementById('eea_title').value = title;
+  document.getElementById('eea_date').value = date;
+  document.getElementById('eea_q').value = q;
+  document.getElementById('eea_req').value = req;
+  document.getElementById('editEAForm').action = '/org/{{ org.id }}/ea/edit/' + eid;
+  openModal('editEA');
+}
+
+// File input change for edit modal
+document.getElementById('eea_new_file') && document.getElementById('eea_new_file').addEventListener('change', function(){
+  if(this.files[0]) document.getElementById('eeaFileText').textContent = '✅ ' + this.files[0].name;
+});
+
+function openEditSession(sid, date, format, orderType){
+  document.getElementById('es_date').value = date;
+  document.getElementById('es_format').value = format;
+  document.getElementById('es_order').value = orderType;
+  document.getElementById('editSessionForm').action = '/org/{{ org.id }}/sessions/edit/' + sid + '?open_sess=' + sid;
+  openModal('editSession');
+}
+
+function confirmDelete(msg){
+  // Show styled confirmation
+  return confirm('⚠️ ВНИМАНИЕ!\n\n' + msg + '\n\nЭто действие необратимо.');
+}
+
+// ── ПОИСК ПО ЗАСЕДАНИЯМ ────────────────────────────────────────
+function sessSearch(){
+  const q     = (document.getElementById('sessSearchInput').value || '').toLowerCase().trim();
+  const year  = document.getElementById('sessFilterYear').value;
+  const fmt   = document.getElementById('sessFilterFormat').value;
+  const cards = document.querySelectorAll('.sess-card');
+  let shown   = 0;
+
+  cards.forEach(function(card){
+    const date   = card.dataset.date   || '';   // YYYY-MM-DD
+    const format = card.dataset.format || '';
+    const order  = card.dataset.order  || '';
+    const text   = card.dataset.text   || '';
+
+    // Фильтр по году
+    if(year && !date.startsWith(year)){ card.style.display='none'; return; }
+    // Фильтр по форме
+    if(fmt  && format !== fmt)         { card.style.display='none'; return; }
+
+    // Текстовый поиск — ищем в дате (DD.MM.YYYY), форме, виде, вопросах
+    const dateRu = date.split('-').reverse().join('.');   // YYYY-MM-DD → DD.MM.YYYY
+    const haystack = (dateRu + ' ' + format + ' ' + order + ' ' + text).toLowerCase();
+    const match = !q || haystack.includes(q);
+
+    if(!match){ card.style.display='none'; return; }
+
+    card.style.display = '';
+    shown++;
+
+    // Если поиск по тексту совпал в вопросах — раскрываем аккордеон
+    if(q && text.toLowerCase().includes(q)){
+      const body = card.querySelector('.acc-body');
+      if(body && !body.classList.contains('open')) body.classList.add('open');
+      // Подсветка совпадений в ячейках таблицы
+      highlightInCard(card, q);
+    } else {
+      // Убираем подсветку если поиск сброшен или совпадение не в тексте
+      clearHighlight(card);
+    }
+  });
+
+  // Счётчик
+  const badge = document.getElementById('sessCountBadge');
+  if(q || year || fmt){
+    badge.textContent = 'Найдено: ' + shown + ' из ' + cards.length;
+  } else {
+    badge.textContent = '';
+    cards.forEach(function(card){ clearHighlight(card); });
+  }
+}
+
+function highlightInCard(card, q){
+  clearHighlight(card);
+  if(!q) return;
+  const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+  // Подсвечиваем только 2-ю колонку (Вопрос) и 4-ю (Примечание) — безопасные текстовые td
+  card.querySelectorAll('tbody tr').forEach(function(tr){
+    const tds = tr.querySelectorAll('td');
+    [1, 3].forEach(function(idx){  // индексы: Вопрос=1, Примечание=3
+      if(!tds[idx]) return;
+      const txt = tds[idx].textContent;
+      if(txt.toLowerCase().includes(q)){
+        tds[idx].innerHTML = txt.replace(re,
+          '<mark style="background:#fff176;color:#333;border-radius:2px;padding:0 2px;">$1</mark>');
+      }
+    });
+  });
+}
+
+function clearHighlight(card){
+  // Убираем mark-теги восстанавливая текст
+  card.querySelectorAll('mark').forEach(function(m){
+    const txt = document.createTextNode(m.textContent);
+    m.parentNode.replaceChild(txt, m);
+  });
+  // Нормализуем текстовые ноды
+  card.querySelectorAll('td').forEach(function(td){ td.normalize(); });
+}
+
+function sessClear(){
+  document.getElementById('sessSearchInput').value = '';
+  document.getElementById('sessFilterYear').value  = '';
+  document.getElementById('sessFilterFormat').value = '';
+  sessSearch();
+  // Закрываем все аккордеоны
+  document.querySelectorAll('.sess-card .acc-body').forEach(function(b){
+    b.classList.remove('open');
+  });
+}
+// ───────────────────────────────────────────────────────────────
+
+function switchTab(name){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pane-'+name).style.display='block';
+  event.target.classList.add('active');
+  history.replaceState(null,'',location.pathname+'?tab='+name);
+}
+
+// Toggle accordion and save state
+function toggleAcc(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  // Close all other session accordions
+  if(id.startsWith('sess-')){
+    document.querySelectorAll('[id^="sess-"]').forEach(other=>{
+      if(other.id !== id) {
+        other.classList.remove('open');
+        sessionStorage.setItem('open_'+other.id,'0');
+      }
+    });
+  }
+  // Toggle this one
+  el.classList.toggle('open');
+  sessionStorage.setItem('open_'+id, el.classList.contains('open')?'1':'0');
+}
+
+// Restore open accordions on page load
+
+function openImportModal(type, title){
+  document.getElementById('importModalTitle').textContent = '📥 Импорт: ' + title;
+  document.getElementById('importForm').action = '/org/{{ org.id }}/import/' + type;
+  document.getElementById('importFileText').textContent = '📎 Нажмите или перетащите Excel файл сюда';
+  openModal('importModal');
+}
+
+function restoreAccordions(){
+  // Only restore session accordions if open_sess param set
+  const urlParams = new URLSearchParams(window.location.search);
+  const openSess = urlParams.get('open_sess');
+  if(openSess){
+    const el = document.getElementById('sess-'+openSess);
+    if(el) el.classList.add('open');
+    return;
+  }
+  // Otherwise restore from sessionStorage only for non-session accordions
+  document.querySelectorAll('.acc-body').forEach(el=>{
+    if(!el.id.startsWith('sess-')){
+      const val=sessionStorage.getItem('open_'+el.id);
+      if(val==='1') el.classList.add('open');
+    }
+  });
+}
+function switchCmtTab(t){
+  document.getElementById('cpane-comp').style.display=t==='comp'?'block':'none';
+  document.getElementById('cpane-sess').style.display=t==='sess'?'block':'none';
+  document.getElementById('ctab-comp').classList.toggle('active',t==='comp');
+  document.getElementById('ctab-sess').classList.toggle('active',t==='sess');
+  sessionStorage.setItem('cmtTab',t);
+}
+const urlP=new URLSearchParams(location.search);
+if(urlP.get('ctab')==='sessions') switchCmtTab('sess');
+
+function openAddAgenda(oid,sid){
+  document.getElementById('addAgendaForm').action='/org/'+oid+'/sessions/'+sid+'/agenda/add?open_sess='+sid;
+  document.getElementById('addAgendaSessionId').value=sid;
+  // Mark this session as open so it stays open after redirect
+  sessionStorage.setItem('open_sess-'+sid,'1');
+  openModal('addAgenda');
+}
+function openEditAgenda(oid,sid,aid,text,status,note){document.getElementById('ea_text').value=text;document.getElementById('ea_status').value=status;document.getElementById('ea_note').value=note;document.getElementById('editAgendaForm').action='/org/'+oid+'/sessions/'+sid+'/agenda/edit/'+aid+'?open_sess='+sid;openModal('editAgenda');}
+function openEditMember(id,fio,role,isind,pos,dfrom,dto,dec){document.getElementById('em_fio').value=fio;document.getElementById('em_role').value=role;document.getElementById('em_isind').checked=isind==1;document.getElementById('em_pos').value=pos;document.getElementById('em_from').value=dfrom;document.getElementById('em_to').value=dto;document.getElementById('em_dec').value=dec;document.getElementById('editMemberForm').action='/org/{{ org.id }}/members/edit/'+id;openModal('editMember');}
+function openAddCmtMember(cid){document.getElementById('addCmtMemberForm').action='/org/{{ org.id }}/committees/'+cid+'/members/add';openModal('addCmtMember');}
+function openEditCmt(cid,name,color){document.getElementById('ecmt_name').value=name;document.getElementById('ecmt_color').value=color;document.getElementById('editCmtForm').action='/org/{{ org.id }}/committees/edit/'+cid;openModal('editCmt');}
+function openEditCmtMember(mid,cid,name,role){document.getElementById('ecmtm_name').value=name;document.getElementById('ecmtm_role').value=role;document.getElementById('editCmtMemberForm').action='/org/{{ org.id }}/committees/'+cid+'/members/edit/'+mid;openModal('editCmtMember');}
+function openAddCmtAgenda(sid,cid){document.getElementById('addCmtAgendaForm').action='/org/{{ org.id }}/cmt-sessions/'+sid+'/agenda/add';document.getElementById('cag_cid').value=cid;openModal('addCmtAgenda');}
+function openEditAcc(id,fio,pos,org,phone,email,dfrom,dto,dec){document.getElementById('eac_fio').value=fio;document.getElementById('eac_pos').value=pos;document.getElementById('eac_org').value=org;document.getElementById('eac_phone').value=phone;document.getElementById('eac_email').value=email;document.getElementById('eac_from').value=dfrom;document.getElementById('eac_to').value=dto;document.getElementById('eac_dec').value=dec;document.getElementById('editAccForm').action='/org/{{ org.id }}/accountable/edit/'+id;openModal('editAcc');}
+function openEditBoard(id,fio,pos,dfrom,dto){document.getElementById('eb_fio').value=fio;document.getElementById('eb_pos').value=pos;document.getElementById('eb_from').value=dfrom;document.getElementById('eb_to').value=dto;document.getElementById('editBoardForm').action='/org/{{ org.id }}/board/edit/'+id;openModal('editBoard');}
+
+// Accountable hint
+const heads=[{% for r in accountable %}{% if r.position=='head' %}{org:"{{ r.org_name|lower|e }}",from:"{{ r.date_from or '' }}",to:"{{ r.date_to or '' }}",dec:"{{ r.decision|e }}"},{% endif %}{% endfor %}];
+function checkHint(){const pos=document.getElementById('add_pos').value,org=document.getElementById('add_org').value.trim().toLowerCase();if(pos==='emp'&&org){const h=heads.find(x=>x.org===org);if(h){document.getElementById('hint_dates').textContent=h.from+(h.to?' — '+h.to:'');document.getElementById('hint_dec').textContent=h.dec||'—';document.getElementById('acc_hint').style.display='block';return;}}document.getElementById('acc_hint').style.display='none';}
+function applyHint(){const org=document.getElementById('add_org').value.trim().toLowerCase();const h=heads.find(x=>x.org===org);if(h){document.getElementById('add_from').value=h.from;document.getElementById('add_to').value=h.to;document.getElementById('add_dec').value=h.dec;}document.getElementById('acc_hint').style.display='none';}
+
+// File upload
+function showFile(inp){if(inp.files[0])document.getElementById('dropText').textContent='✅ '+inp.files[0].name;}
+
+function showFileWP(inp){
+  if(inp.files[0]){
+    document.getElementById('wpDropText').textContent='✅ '+inp.files[0].name;
+    document.getElementById('wpSubmit').style.display='inline-flex';
+  }
+}
+function handleDropWP(e){
+  e.preventDefault();
+  const f=e.dataTransfer.files[0];
+  if(f){const dt=new DataTransfer();dt.items.add(f);document.getElementById('wp_file').files=dt.files;showFileWP(document.getElementById('wp_file'));}
+  e.currentTarget.style.borderColor='';
+}
+
+function handleDrop(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f){const dt=new DataTransfer();dt.items.add(f);document.getElementById('doc_file').files=dt.files;showFile(document.getElementById('doc_file'));}e.currentTarget.style.borderColor='';}
+restoreAccordions();
+// Restore committee sub-tab
+const savedCmtTab=sessionStorage.getItem('cmtTab');
+if(savedCmtTab) switchCmtTab(savedCmtTab);
+
+// ── CALENDAR ─────────────────────────────────────
+(function(){
+  const CAL_EVENTS = [
+    {% for s in sessions %}{date:'{{ s.session_date }}',type:'sess',title:'Заседание СД · {{ fmt(s.session_date) }}',detail:'{{ s.format }} · {{ s.order_type }}'},{% endfor %}
+    {% for s in cmt_sessions %}{date:'{{ s.session_date }}',type:'cmt',title:'Заседание комитетов · {{ fmt(s.session_date) }}',detail:'{{ s.protocol_num or "" }}'},{% endfor %}
+    {% for m in members %}{% if m.date_to %}{date:'{{ m.date_to }}',type:'member',title:'Истекает: {{ m.full_name|e }}',detail:'{{ m.position|e }}'},{% endif %}{% endfor %}
+    {% for r in board %}{% if r.date_to %}{date:'{{ r.date_to }}',type:'board',title:'Истекает: {{ r.full_name|e }}',detail:'{{ r.position|e }}'},{% endif %}{% endfor %}
+    {% for r in accountable %}{% if r.date_to %}{date:'{{ r.date_to }}',type:'acc',title:'Истекает: {{ r.full_name|e }}',detail:'{{ r.org_name|e }}'},{% endif %}{% endfor %}
+  ];
+  const COLORS={sess:'#2563eb',cmt:'#be185d',member:'#7ab317',board:'#e65100',acc:'#9333ea'};
+  const MR=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const todayD=new Date();
+  let calYear=todayD.getFullYear(), calMonth=todayD.getMonth();
+
+  function initCal(){
+    const ytEl=document.getElementById('calYearTabs');
+    if(!ytEl||ytEl.children.length>0) return;
+    [2026,2027,2028,2029,2030].forEach(y=>{
+      const b=document.createElement('div');
+      b.className='cal-yt'+(y===calYear?' active':'');
+      b.textContent=y;
+      b.onclick=()=>{calYear=y;document.querySelectorAll('.cal-yt').forEach(t=>t.classList.remove('active'));b.classList.add('active');calRender();};
+      ytEl.appendChild(b);
+    });
+    calRender();
+  }
+
+  window.calRender=function(){
+    const el=document.getElementById('calCurMonth');
+    if(!el) return;
+    el.textContent=MR[calMonth]+' '+calYear;
+    const grid=document.getElementById('calDaysGrid');
+    grid.innerHTML='';
+    const first=new Date(calYear,calMonth,1);
+    const last=new Date(calYear,calMonth+1,0);
+    let s=first.getDay();s=s===0?6:s-1;
+    for(let i=0;i<s;i++) calAddDay(grid,new Date(calYear,calMonth,-s+i+1),true);
+    for(let i=1;i<=last.getDate();i++) calAddDay(grid,new Date(calYear,calMonth,i),false);
+    const tot=s+last.getDate();const rem=tot%7===0?0:7-tot%7;
+    for(let i=1;i<=rem;i++) calAddDay(grid,new Date(calYear,calMonth+1,i),true);
+    calUpdateSummary();
+  };
+
+  function calAddDay(container,date,other){
+    const cell=document.createElement('div');
+    cell.className='cal-day'+(other?' cal-other':'');
+    const dow=date.getDay();
+    if(dow===0||dow===6) cell.classList.add('cal-wend');
+    if(date.toDateString()===todayD.toDateString()) cell.classList.add('cal-today');
+    const n=document.createElement('div');n.className='cal-dnum';n.textContent=date.getDate();cell.appendChild(n);
+    const ds=date.getFullYear()+'-'+(String(date.getMonth()+1).padStart(2,'0'))+'-'+(String(date.getDate()).padStart(2,'0'));
+    CAL_EVENTS.filter(e=>e.date===ds).forEach(ev=>{
+      const el=document.createElement('div');
+      el.className='cal-ev';
+      el.style.background=COLORS[ev.type]||'#888';
+      el.textContent=ev.title;
+      el.onmouseenter=e=>calShowTip(e,ev);
+      el.onmouseleave=calHideTip;
+      cell.appendChild(el);
+    });
+    container.appendChild(cell);
+  }
+
+  function calUpdateSummary(){
+    const s=new Date(calYear,calMonth,1),e=new Date(calYear,calMonth+1,0);
+    const inM=ev=>{const d=new Date(ev.date);return d>=s&&d<=e;};
+    ['sess','cmt','member','board','acc'].forEach((t,i)=>{
+      const el=document.getElementById('csum'+i);if(el)el.textContent=CAL_EVENTS.filter(ev=>ev.type===t&&inM(ev)).length;
+    });
+  }
+
+  function calShowTip(e,ev){
+    const t=document.getElementById('calTip');
+    t.innerHTML='<div class="cal-tip-title" style="color:'+COLORS[ev.type]+'">'+ev.title+'</div>'+(ev.detail||'');
+    t.style.display='block';t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-20)+'px';
+  }
+  function calHideTip(){const t=document.getElementById('calTip');if(t)t.style.display='none';}
+
+  window.calPrev=function(){if(calMonth===0){calMonth=11;calYear--;}else calMonth--;calRender();}
+  window.calNext=function(){if(calMonth===11){calMonth=0;calYear++;}else calMonth++;calRender();}
+  window.calToday=function(){calYear=todayD.getFullYear();calMonth=todayD.getMonth();calRender();}
+
+  // Init when calendar tab is shown
+  document.addEventListener('DOMContentLoaded',function(){
+    if(document.getElementById('pane-calendar').style.display!=='none') initCal();
+  });
+
+  // Hook into switchTab
+  const _origSwitchTab = window.switchTab;
+  document.addEventListener('DOMContentLoaded',function(){
+    window.switchTab = function(name){
+      _origSwitchTab(name);
+      if(name==='calendar') initCal();
+    };
+  });
+})();
+
+
+// ── Парсинг повестки из .docx ─────────────────────────────
+async function parseAgendaDocx(input, orgId) {
+  const file = input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+
+  // Показываем лоадер
+  document.getElementById('agendaParseLoader').style.display = 'flex';
+  openModal('agendaPreviewModal');
+
+  try {
+    const res = await fetch(`/org/${orgId}/sessions/parse-agenda`, {method:'POST', body: formData});
+    const data = await res.json();
+    if (data.error) { alert('Ошибка: ' + data.error); closeModal('agendaPreviewModal'); return; }
+    renderAgendaPreview(data, orgId);
+  } catch(e) {
+    alert('Не удалось прочитать файл: ' + e.message);
+    closeModal('agendaPreviewModal');
+  } finally {
+    document.getElementById('agendaParseLoader').style.display = 'none';
+    input.value = '';
+  }
+}
+
+function renderAgendaPreview(data, orgId) {
+  document.getElementById('agendaParseLoader').style.display = 'none';
+  const preview = document.getElementById('agendaPreviewContent');
+
+  const fmtDisplay = d => {
+    if (!d) return '—';
+    const [y,m,dd] = d.split('-');
+    return `${dd}.${m}.${y}`;
+  };
+
+  let agendaRows = (data.agenda || []).map((item, i) => `
+    <tr>
+      <td style="padding:6px 8px;border:1px solid #e0e0e0;color:#999;font-size:11px;text-align:center;width:30px;">${i+1}</td>
+      <td style="padding:6px 8px;border:1px solid #e0e0e0;font-size:11px;">
+        <textarea name="agenda_texts" rows="2" style="width:100%;font-size:11px;border:1px solid #ddd;border-radius:4px;padding:4px;resize:vertical;box-sizing:border-box;">${escHtml(item.text)}</textarea>
+        <input type="hidden" name="agenda_statuses" value="pending">
+        <input type="hidden" name="agenda_notes" value="">
+      </td>
+      <td style="padding:4px;border:1px solid #e0e0e0;text-align:center;width:36px;">
+        <button type="button" onclick="this.closest('tr').remove();updateAgendaCount()" style="background:#fee;color:#c00;border:1px solid #fcc;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">✕</button>
+      </td>
+    </tr>`).join('');
+
+  preview.innerHTML = `
+  <form method="post" action="/org/${orgId}/sessions/import-agenda" id="agendaImportForm">
+    <!-- Мета-данные -->
+    <div style="background:#f5f8f0;border:1px solid #c8ddb4;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+      <div style="font-size:10px;font-weight:700;color:#5a7a3a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📋 Параметры заседания</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#666;display:block;margin-bottom:4px;">Дата заседания</label>
+          <input name="session_date" type="date" value="${data.date||''}" required
+            style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#666;display:block;margin-bottom:4px;">Форма</label>
+          <select name="format" style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;">
+            <option value="Очное" ${data.format==='Очное'?'selected':''}>Очное</option>
+            <option value="Заочное" ${data.format==='Заочное'?'selected':''}>Заочное</option>
+            <option value="Смешанное" ${data.format==='Смешанное'?'selected':''}>Смешанное</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#666;display:block;margin-bottom:4px;">Вид</label>
+          <select name="order_type" style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;">
+            <option value="Очередное" ${data.order_type==='Очередное'?'selected':''}>Очередное</option>
+            <option value="Внеочередное" ${data.order_type==='Внеочередное'?'selected':''}>Внеочередное</option>
+          </select>
+        </div>
+      </div>
+      ${data.place ? `<div style="margin-top:10px;font-size:11px;color:#666;"><span style="font-weight:600;">📍 Место:</span> ${escHtml(data.place)}</div>` : ''}
+      ${data.time ? `<div style="margin-top:4px;font-size:11px;color:#666;"><span style="font-weight:600;">⏰ Время:</span> ${data.time}</div>` : ''}
+    </div>
+
+    <!-- Вопросы повестки -->
+    <div style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+      📋 Вопросы повестки
+      <span id="agendaCount" style="background:#1565c0;color:#fff;border-radius:12px;padding:2px 10px;font-size:10px;font-weight:700;">${data.agenda.length}</span>
+      <button type="button" onclick="addAgendaRow()" style="margin-left:auto;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">+ Добавить вопрос</button>
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;" id="agendaTable">
+      <thead>
+        <tr style="background:#2d3a1f;color:#f5f0e8;">
+          <th style="padding:8px;border:1px solid rgba(255,255,255,.1);width:30px;">№</th>
+          <th style="padding:8px;border:1px solid rgba(255,255,255,.1);">Наименование вопроса</th>
+          <th style="padding:8px;border:1px solid rgba(255,255,255,.1);width:36px;"></th>
+        </tr>
+      </thead>
+      <tbody id="agendaTbody">${agendaRows}</tbody>
+    </table>
+    </div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px;">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('agendaPreviewModal')">Отмена</button>
+      <button type="submit" class="btn btn-primary">💾 Создать заседание (${data.agenda.length} вопросов)</button>
+    </div>
+  </form>`;
+
+  updateAgendaCount();
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateAgendaCount() {
+  const rows = document.querySelectorAll('#agendaTbody tr');
+  const el = document.getElementById('agendaCount');
+  if (el) el.textContent = rows.length;
+  // Обновляем счётчик на кнопке submit
+  const btn = document.querySelector('#agendaImportForm button[type=submit]');
+  if (btn) btn.textContent = `💾 Создать заседание (${rows.length} вопросов)`;
+  // Перенумеровать строки
+  rows.forEach((tr, i) => { const td = tr.querySelector('td:first-child'); if(td) td.textContent = i+1; });
+}
+
+function addAgendaRow() {
+  const tbody = document.getElementById('agendaTbody');
+  if (!tbody) return;
+  const i = tbody.querySelectorAll('tr').length + 1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="padding:6px 8px;border:1px solid #e0e0e0;color:#999;font-size:11px;text-align:center;">${i}</td>
+    <td style="padding:6px 8px;border:1px solid #e0e0e0;"><textarea name="agenda_texts" rows="2" style="width:100%;font-size:11px;border:1px solid #ddd;border-radius:4px;padding:4px;resize:vertical;box-sizing:border-box;" placeholder="Введите вопрос повестки..."></textarea><input type="hidden" name="agenda_statuses" value="pending"><input type="hidden" name="agenda_notes" value=""></td>
+    <td style="padding:4px;border:1px solid #e0e0e0;text-align:center;width:36px;"><button type="button" onclick="this.closest('tr').remove();updateAgendaCount()" style="background:#fee;color:#c00;border:1px solid #fcc;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">✕</button></td>`;
+  tbody.appendChild(tr);
+  updateAgendaCount();
+}
+</script>
+{% endblock %}
